@@ -67,7 +67,7 @@ Webブラウザの裏側にあるHTMLコード（DOM）を解析し、操作ロ�
 - Agent: ADK
 - バックエンド: Fast API
 - フロントエンド: Next.js
-
-
-
+- インフラ: Google Cloud
+    - デプロイ: App Engine
+    - AI API 管理: Vertex AI
 
