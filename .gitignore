@@ -8,6 +8,7 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+backend/uploads/
 
 # Node.js / Frontend
 node_modules/
