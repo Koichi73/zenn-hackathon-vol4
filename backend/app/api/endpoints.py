@@ -50,9 +50,16 @@ async def process_video(file: UploadFile = File(...)):
             # Fallback for dev without quota
             steps = DUMMY_RESPONSE
         
-        # 2. Extract Frames (Future Implementation)
-        # video_service = VideoService()
-        # frames = await video_service.extract_frames(file_path, steps)
+        # 2. Extract Frames
+        try:
+            video_service = VideoService()
+            # We are saving to app/static/images. 
+            # Mounting point is /static -> app/static.
+            # So images should be in app/static/images.
+            steps = await video_service.extract_frames(file_path, steps, output_dir="app/static/images")
+        except Exception as e:
+            print(f"Video Extraction Error: {e}")
+            # If extraction fails, steps will just lack image_url or have it as None
         
         # 3. Format Response
         return {

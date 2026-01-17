@@ -9,6 +9,7 @@ __pycache__/
 venv/
 *.egg-info/
 backend/uploads/
+backend/app/static/
 
 # Node.js / Frontend
 node_modules/

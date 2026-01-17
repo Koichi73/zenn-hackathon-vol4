@@ -43,15 +43,21 @@ export default function Home() {
   };
 
   const generateMarkdownFromSteps = (data: any) => {
-    // This is a temporary formatter for the dummy data
-    // Real backend might return markdown directly or we format it here
     let md = `# Video Manual: ${data.filename}\n\n`;
+    const backendUrl = "http://localhost:8000";
+
     if (data.steps) {
       data.steps.forEach((step: any, index: number) => {
         md += `## Step ${index + 1}: ${step.title}\n`;
         md += `**Timestamp:** ${step.timestamp}\n\n`;
         md += `${step.description}\n\n`;
-        md += `![Step ${index + 1} Image](https://placehold.co/600x400?text=Frame+at+${step.timestamp})\n\n`;
+
+        if (step.image_url) {
+          // Ensure we construct a valid full URL
+          const fullImageUrl = `${backendUrl}${step.image_url}`;
+          md += `![Step ${index + 1} Image](${fullImageUrl})\n\n`;
+        }
+
         md += `---\n\n`;
       });
     }

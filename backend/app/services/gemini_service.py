@@ -1,5 +1,5 @@
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part
+from google import genai
+from google.genai import types
 import os
 import json
 from dotenv import load_dotenv
@@ -14,30 +14,29 @@ class GeminiService:
         if not project_id:
             raise ValueError("PROJECT_ID not set in environment variables")
             
-        vertexai.init(project=project_id, location=location)
-        # Using Gemini 1.5 Flash as it is available and multimodal
-        # Gemini 3 implies newer models, check availability. 
-        # For now using 'gemini-1.5-flash-001' or similar reliable model.
-        self.model = GenerativeModel("gemini-2.0-flash-exp")
+        # Initialize Google Gen AI Client for Vertex AI
+        self.client = genai.Client(
+            vertexai=True,
+            project=project_id,
+            location=location
+        )
+        
+        # Using Gemini 3 Flash Preview as requested
+        self.model_name = os.getenv("MODEL_NAME", "gemini-3-flash-preview")
 
     async def analyze_video(self, video_path: str):
         """
         Analyzes the video and extracts steps in JSON format using Gemini.
         """
         
-        # 1. Read video file
-        # Vertex AI GenerativeModel supports passing bytes or URI.
-        # For local file -> bytes or upload to GCS. 
-        # Large videos should be on GCS, but for MVP local bytes might work for short clips
-        # Or using Part.from_data if supported for video/mp4.
-        
-        # Ideally, we should upload to GCS for Vertex AI to access video reliably.
-        # However, for 'Flash' models, sending bytes directly is supported up to a limit.
-        
+        # Read video file
         with open(video_path, "rb") as f:
             video_data = f.read()
             
-        video_part = Part.from_data(data=video_data, mime_type="video/mp4")
+        video_part = types.Part.from_bytes(
+            data=video_data,
+            mime_type="video/mp4"
+        )
         
         prompt = """
         You are an expert technical writer.
@@ -57,15 +56,21 @@ class GeminiService:
         - Respond ONLY with the JSON.
         """
         
-        response = self.model.generate_content(
-            [video_part, prompt],
-            generation_config={"response_mime_type": "application/json"}
-        )
-        
         try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[video_part, prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
+            
+            # The new SDK parses JSON automatically if response_mime_type is application/json
+            # But specific behavior might depend on SDK version. 
+            # safe assumption: response.text contains the JSON string.
+            
             steps = json.loads(response.text)
             return steps
-        except json.JSONDecodeError:
-            # Fallback or robust parsing could go here
-            print(f"Failed to parse JSON: {response.text}")
+        except Exception as e:
+            print(f"Error during Gemini analysis: {e}")
             return []
