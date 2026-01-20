@@ -39,20 +39,43 @@ class GeminiService:
         )
         
         prompt = """
-        You are an expert technical writer.
+        You are an expert technical writer and security compliance officer.
         Analyze this video and create a step-by-step instruction manual.
-        
+        Identify any personal information (PII) or sensitive data visible in the video frames that should be masked.
+
+        Personal information includes:
+        - Email addresses (look for patterns like name@domain.com)
+        - Phone numbers
+        - Addresses
+        - Credit card numbers
+        - Social security numbers
+        - Passwords or API keys
+        - Any Japanese names (Kanji, Hiragana, Katakana, or Romanized/Romaji)
+
+        CRITICAL INSTRUCTIONS FOR PRIVACY MASKING:
+        - Check the window title bars.
+        - Check file explorer paths.
+        - It is better to mask too much than too little.
+
         Output valid JSON with the following structure:
         [
             {
                 "title": "Step Title",
                 "description": "Detailed description of the action.",
-                "timestamp": "MM:SS"
+                "timestamp": "MM:SS",
+                "privacy_masks": [
+                    {
+                        "label": "email or username", 
+                        "box_2d": [ymin, xmin, ymax, xmax] 
+                    }
+                ]
             }
         ]
         
         - The timestamp must be in MM:SS format (e.g., 00:05).
         - Choose the exact moment where the action is clearly visible for a screenshot.
+        - "privacy_masks": List of bounding boxes for sensitive info (email, names, phone numbers, API keys, etc.).
+        - "box_2d": Normalized coordinates [ymin, xmin, ymax, xmax] where values are between 0 and 1000.
         - Respond ONLY with the JSON.
         """
         

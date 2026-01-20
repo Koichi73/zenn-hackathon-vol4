@@ -2,18 +2,20 @@
 
 import { useState } from "react";
 import { VideoUploader } from "@/components/VideoUploader";
-import { ManualPreview } from "@/components/ManualPreview";
+import { ManualEditor } from "@/components/ManualEditor";
 import { Loader2 } from "lucide-react";
 
 export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [resultMarkdown, setResultMarkdown] = useState<string | null>(null);
+  const [steps, setSteps] = useState<any[] | null>(null);
+  const [filename, setFilename] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   const handleFileSelect = async (file: File) => {
     setIsProcessing(true);
     setError(null);
-    setResultMarkdown(null);
+    setSteps(null);
+    setFilename(file.name);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -30,38 +32,13 @@ export default function Home() {
       }
 
       const data = await response.json();
-
-      // Convert dummy steps to markdown for MVP verification
-      const markdown = generateMarkdownFromSteps(data);
-      setResultMarkdown(markdown);
+      setSteps(data.steps);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to upload video");
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const generateMarkdownFromSteps = (data: any) => {
-    let md = `# Video Manual: ${data.filename}\n\n`;
-    const backendUrl = "http://localhost:8000";
-
-    if (data.steps) {
-      data.steps.forEach((step: any, index: number) => {
-        md += `## Step ${index + 1}: ${step.title}\n`;
-        md += `**Timestamp:** ${step.timestamp}\n\n`;
-        md += `${step.description}\n\n`;
-
-        if (step.image_url) {
-          // Ensure we construct a valid full URL
-          const fullImageUrl = `${backendUrl}${step.image_url}`;
-          md += `![Step ${index + 1} Image](${fullImageUrl})\n\n`;
-        }
-
-        md += `---\n\n`;
-      });
-    }
-    return md;
   };
 
   return (
@@ -91,8 +68,12 @@ export default function Home() {
           </div>
         )}
 
-        {resultMarkdown && (
-          <ManualPreview markdown={resultMarkdown} />
+        {steps && (
+          <ManualEditor
+            initialSteps={steps}
+            backendUrl="http://localhost:8000"
+            filename={filename}
+          />
         )}
       </div>
     </main>

@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check, Printer } from 'lucide-react';
 
@@ -18,6 +20,57 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const ImageRenderer: Components['img'] = ({ src, alt }) => {
+        if (!src || typeof src !== 'string') return null;
+
+        let masks: any[] = [];
+        let cleanSrc = src;
+
+        try {
+            const urlObj = new URL(src, window.location.origin); // Handle relative URLs
+            const masksParam = urlObj.searchParams.get('masks');
+            if (masksParam) {
+                masks = JSON.parse(decodeURIComponent(masksParam));
+                // Remove param for the actual image src, or keep it? 
+                // HTML img src works with extra params usually.
+                // But for cleanliness/caching, maybe keep it.
+                // However, we want to show the image. 
+                // Let's keep cleanSrc as is (with params) or strip?
+                // If the backend ignores params, it's fine.
+                // Let's strip the masks param for the <img> tag just in case.
+                urlObj.searchParams.delete('masks');
+                cleanSrc = urlObj.toString();
+                // If it was relative, toString might make it absolute. 
+                // That's generally fine.
+            }
+        } catch (e) {
+            console.error("Failed to parse masks from URL", e);
+        }
+
+        return (
+            <span className="relative inline-block max-w-full">
+                <img src={cleanSrc} alt={alt} className="max-w-full h-auto rounded-lg shadow-sm" />
+                {masks.map((mask, i) => {
+                    const [ymin, xmin, ymax, xmax] = mask.box_2d;
+                    // Assuming 0-1000 scale
+                    return (
+                        <span
+                            key={i}
+                            className="absolute border-2 border-red-500 bg-black/50"
+                            style={{
+                                top: `${ymin / 10}%`,
+                                left: `${xmin / 10}%`,
+                                width: `${(xmax - xmin) / 10}%`,
+                                height: `${(ymax - ymin) / 10}%`,
+                            }}
+                            title="Privacy Mask"
+                        />
+                    );
+                })}
+            </span>
+        );
     };
 
     return (
@@ -42,7 +95,12 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
                 </div>
             </div>
             <div className="p-8 prose max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                        img: ImageRenderer
+                    }}
+                >
                     {markdown}
                 </ReactMarkdown>
             </div>
