@@ -41,21 +41,20 @@ class GeminiService:
         prompt = """
         You are an expert technical writer and security compliance officer.
         Analyze this video and create a step-by-step instruction manual.
-        Identify any personal information (PII) or sensitive data visible in the video frames that should be masked.
+        
+        You have two key visual tasks:
+        1. Identify the ACTIVE ELEMENT (button, link, field) being interacted with in the step.
+        2. Identify PERSONAL INFORMATION (PII) that must be masked.
 
-        Personal information includes:
-        - Email addresses (look for patterns like name@domain.com)
-        - Phone numbers
-        - Addresses
-        - Credit card numbers
-        - Social security numbers
-        - Passwords or API keys
-        - Any Japanese names (Kanji, Hiragana, Katakana, or Romanized/Romaji)
+        CRITICAL INSTRUCTIONS FOR BUTTON HIGHLIGHTING:
+        - Identify the specific button, link, menu item, or input field being clicked or interacted with.
+        - Create a bounding box around this element.
+        - Mark this with type: "highlight".
 
         CRITICAL INSTRUCTIONS FOR PRIVACY MASKING:
-        - Check the window title bars.
-        - Check file explorer paths.
-        - It is better to mask too much than too little.
+        - Identify personal information (email, phone, address, credit card, SSN, passwords, Japanese names).
+        - Check window title bars and file explorer paths.
+        - Mark this with type: "privacy".
 
         Output valid JSON with the following structure:
         [
@@ -63,10 +62,16 @@ class GeminiService:
                 "title": "Step Title",
                 "description": "Detailed description of the action.",
                 "timestamp": "MM:SS",
-                "privacy_masks": [
+                "masks": [
                     {
-                        "label": "email or username", 
-                        "box_2d": [ymin, xmin, ymax, xmax] 
+                        "label": "submit button",
+                        "box_2d": [ymin, xmin, ymax, xmax],
+                        "type": "highlight"
+                    },
+                    {
+                        "label": "email address",
+                        "box_2d": [ymin, xmin, ymax, xmax],
+                        "type": "privacy"
                     }
                 ]
             }
@@ -74,7 +79,6 @@ class GeminiService:
         
         - The timestamp must be in MM:SS format (e.g., 00:05).
         - Choose the exact moment where the action is clearly visible for a screenshot.
-        - "privacy_masks": List of bounding boxes for sensitive info (email, names, phone numbers, API keys, etc.).
         - "box_2d": Normalized coordinates [ymin, xmin, ymax, xmax] on a scale of 0 to 1000.
         - IMPORTANT: Coordinates MUST be integers between 0 and 1000.
         - Respond ONLY with the JSON.

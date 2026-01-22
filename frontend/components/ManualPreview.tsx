@@ -44,19 +44,24 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
             <span className="relative inline-block max-w-full">
                 <img src={cleanSrc} alt={alt} className="max-w-full h-auto rounded-lg shadow-sm" />
                 {masks.map((mask, i) => {
+                    if (!mask.box_2d) return null;
                     const [ymin, xmin, ymax, xmax] = mask.box_2d;
-                    // Assuming 0-1000 scale
+                    const isHighlight = mask.type === 'highlight';
+
                     return (
                         <span
                             key={i}
-                            className="absolute border-2 border-red-500 bg-black/50"
+                            className={`absolute ${isHighlight
+                                ? "border-4 border-red-600 bg-transparent"
+                                : "bg-black/80" // Privacy mask: dark, no border
+                                }`}
                             style={{
                                 top: `${ymin / 10}%`,
                                 left: `${xmin / 10}%`,
                                 width: `${(xmax - xmin) / 10}%`,
                                 height: `${(ymax - ymin) / 10}%`,
                             }}
-                            title="Privacy Mask"
+                            title={mask.label || (isHighlight ? "Button Highlight" : "Privacy Mask")}
                         />
                     );
                 })}

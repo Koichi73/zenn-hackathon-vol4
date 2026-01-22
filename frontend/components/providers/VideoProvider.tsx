@@ -8,6 +8,7 @@ interface Step {
   timestamp: string;
   image_url: string | null;
   privacy_masks?: any[];
+  masks?: any[];
   [key: string]: any;
 }
 

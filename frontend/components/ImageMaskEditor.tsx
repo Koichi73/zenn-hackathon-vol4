@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Stage, Layer, Image as KonvaImage, Rect, Transformer } from 'react-konva';
 import useImage from 'use-image';
 import Konva from 'konva';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Scan, MousePointer2 } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 interface Mask {
     id: string;
@@ -12,6 +13,7 @@ interface Mask {
     y: number;
     width: number;
     height: number;
+    type: 'privacy' | 'highlight';
 }
 
 interface ImageMaskEditorProps {
@@ -19,11 +21,13 @@ interface ImageMaskEditorProps {
     initialMasks?: Array<{
         box_2d: number[]; // [ymin, xmin, ymax, xmax] 0-1000
         label?: string;
+        type?: 'privacy' | 'highlight';
     }>;
-    onUpdate: (masks: Array<{ box_2d: number[], label: string }>) => void;
+    onUpdate: (masks: Array<{ box_2d: number[], label: string, type: 'privacy' | 'highlight' }>) => void;
+    className?: string;
 }
 
-export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskEditorProps) {
+export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }: ImageMaskEditorProps) {
     const [image] = useImage(imageUrl);
     const [masks, setMasks] = useState<Mask[]>([]);
     const [selectedId, selectShape] = useState<string | null>(null);
@@ -44,7 +48,10 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
                 const scaleY = image.naturalHeight / 1000;
 
                 // Try to preserve existing ID to maintain selection state
-                const existingId = masks[i]?.id;
+                const existingId = masks.find(existing =>
+                    Math.abs(existing.x - xmin * scaleX) < 1 &&
+                    Math.abs(existing.y - ymin * scaleY) < 1
+                )?.id;
                 const id = existingId || `mask-${i}`;
 
                 return {
@@ -53,6 +60,7 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
                     y: ymin * scaleY,
                     width: (xmax - xmin) * scaleX,
                     height: (ymax - ymin) * scaleY,
+                    type: (m.type as 'privacy' | 'highlight') || 'privacy'
                 };
             });
 
@@ -62,20 +70,25 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
 
     // Handle container resize
     useEffect(() => {
-        if (image && containerRef.current) {
-            // Use clientWidth to exclude borders
-            const containerWidth = containerRef.current.clientWidth;
-            const containerHeight = Math.min(window.innerHeight * 0.6, containerWidth * (image.height / image.width));
+        const updateDimensions = () => {
+            if (image && containerRef.current) {
+                const containerWidth = containerRef.current.clientWidth;
+                // Calculate height based on aspect ratio
+                const ratio = image.naturalHeight / image.naturalWidth;
+                const height = containerWidth * ratio;
 
-            // Just fit to width for now, or maintain aspect ratio?
-            // Let's maintain aspect ratio but limit height if needed?
-            // For simplicity, just width-based scaling as before.
-            const scale = containerWidth / image.naturalWidth;
-            setDimensions({
-                width: containerWidth,
-                height: image.naturalHeight * scale
-            });
-        }
+                const scale = containerWidth / image.naturalWidth;
+                setDimensions({
+                    width: containerWidth,
+                    height: height
+                });
+            }
+        };
+
+        updateDimensions();
+        // Add resize listener just in case
+        window.addEventListener('resize', updateDimensions);
+        return () => window.removeEventListener('resize', updateDimensions);
     }, [image]);
 
     // Setup transformer
@@ -145,21 +158,29 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
             const ymax = ((mask.y + mask.height) / image.naturalHeight) * 1000;
 
             return {
-                label: 'sensitive',
-                box_2d: [ymin, xmin, ymax, xmax].map(val => Math.min(1000, Math.max(0, Math.round(val))))
+                label: mask.type === 'highlight' ? 'button' : 'sensitive',
+                box_2d: [ymin, xmin, ymax, xmax].map(val => Math.min(1000, Math.max(0, Math.round(val)))),
+                type: mask.type
             };
         });
         onUpdate(normalizedMasks);
     };
 
-    const addMask = () => {
+    const addMask = (type: 'privacy' | 'highlight') => {
         if (!image) return;
+        // Add to center of view
+        const width = image.naturalWidth * 0.2;
+        const height = image.naturalHeight * 0.1;
+        const x = (image.naturalWidth - width) / 2;
+        const y = (image.naturalHeight - height) / 2;
+
         const newMask: Mask = {
             id: `mask-${Date.now()}`,
-            x: image.naturalWidth * 0.4,
-            y: image.naturalHeight * 0.4,
-            width: image.naturalWidth * 0.2,
-            height: image.naturalHeight * 0.1,
+            x,
+            y,
+            width,
+            height,
+            type
         };
         const newMasks = [...masks, newMask];
         setMasks(newMasks);
@@ -175,33 +196,56 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
         notifyUpdate(newMasks);
     };
 
-    if (!image) return <div className="animate-pulse bg-gray-200 w-full h-64 rounded-lg"></div>;
+    if (!image) return <div className="animate-pulse bg-slate-100 w-full aspect-video rounded-lg"></div>;
 
     // Use natural dimensions for consistent aspect ratio calculation
     const scale = dimensions.width / image.naturalWidth;
 
     return (
-        <div className="space-y-4">
-            <div className="flex gap-2">
+        <div className={cn("space-y-2", className)}>
+            {/* Toolbar */}
+            <div className="flex items-center gap-2 p-1 bg-white border rounded-lg shadow-sm w-fit">
+                <div className="flex items-center gap-1 border-r pr-2 mr-1">
+                    <span className="text-xs font-semibold text-slate-500 px-2">Edit Tool</span>
+                </div>
+
                 <button
-                    onClick={addMask}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+                    onClick={() => addMask('privacy')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
+                    title="Add Privacy Mask"
                 >
                     <Plus className="w-3.5 h-3.5" />
                     Add Mask
                 </button>
-                {selectedId && (
-                    <button
-                        onClick={removeSelectedMask}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Remove Selected
-                    </button>
-                )}
+                <button
+                    onClick={() => addMask('highlight')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                    title="Add Highlight Frame"
+                >
+                    <Scan className="w-3.5 h-3.5" />
+                    Add Highlight
+                </button>
+
+                <div className="w-px h-4 bg-slate-200 mx-1" />
+
+                <button
+                    onClick={removeSelectedMask}
+                    disabled={!selectedId}
+                    className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors",
+                        selectedId
+                            ? "text-red-600 hover:bg-red-50"
+                            : "text-slate-300 cursor-not-allowed"
+                    )}
+                    title="Delete Selected"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete Selected
+                </button>
             </div>
 
-            <div className="border rounded-lg overflow-hidden bg-gray-900" ref={containerRef}>
+            {/* Editor Area */}
+            <div className="relative border rounded-lg overflow-hidden bg-slate-100 ring-offset-2 ring-indigo-500 has-[:focus]:ring-2" tabIndex={0} ref={containerRef}>
                 <Stage
                     width={dimensions.width}
                     height={dimensions.height}
@@ -214,6 +258,7 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
                         }
                     }}
                     ref={stageRef}
+                    style={{ cursor: 'crosshair' }}
                 >
                     <Layer>
                         <KonvaImage image={image} />
@@ -225,20 +270,29 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
                                 y={mask.y}
                                 width={mask.width}
                                 height={mask.height}
-                                fill="rgba(0, 0, 0, 0.5)" // Semi-transparent black specifically for privacy mask
-                                stroke="#ef4444" // Red border to indicate editable area
-                                strokeWidth={2 / scale} // Maintain constant stroke width regardless of scale
+                                fill={mask.type === 'privacy' ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 0, 0, 0.0)"}
+                                stroke="#ef4444"
+                                strokeWidth={mask.id === selectedId ? 4 / scale : (mask.type === 'highlight' ? 4 / scale : 0)}
+                                dash={mask.type === 'highlight' ? undefined : undefined}
+                                opacity={mask.type === 'privacy' ? 1 : 1}
                                 draggable
                                 onClick={() => selectShape(mask.id)}
                                 onTap={() => selectShape(mask.id)}
                                 onDragEnd={(e) => handleDragEnd(e, mask.id)}
                                 onTransformEnd={(e) => handleTransformEnd(e, mask.id)}
+                                onMouseEnter={(e) => {
+                                    const container = e.target.getStage()?.container();
+                                    if (container) container.style.cursor = 'move';
+                                }}
+                                onMouseLeave={(e) => {
+                                    const container = e.target.getStage()?.container();
+                                    if (container) container.style.cursor = 'crosshair';
+                                }}
                             />
                         ))}
                         <Transformer
                             ref={transformerRef}
                             boundBoxFunc={(oldBox, newBox) => {
-                                // Limit minimum size
                                 if (newBox.width < 5 || newBox.height < 5) {
                                     return oldBox;
                                 }
@@ -253,9 +307,17 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
                         />
                     </Layer>
                 </Stage>
+
+                {masks.length === 0 && (
+                    <div className="absolute top-4 left-4 pointer-events-none text-xs text-slate-500 bg-white/80 px-2 py-1 rounded backdrop-blur-sm">
+                        No masks added. Use the controls above to add masks or highlights.
+                    </div>
+                )}
             </div>
-            <p className="text-xs text-gray-500">
-                Click on a mask to resize or move. Click empty space to deselect.
+
+            <p className="text-xs text-slate-500 flex items-center gap-1">
+                <MousePointer2 className="w-3 h-3" />
+                Click on a mask/frame to resize or move. Click empty space to deselect.
             </p>
         </div>
     );
