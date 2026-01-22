@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { Download, Cast as MaskIcon, Play, Maximize2, Minimize2, X, ChevronRight, PenTool } from 'lucide-react';
+import { Download, Cast as MaskIcon, Play, Maximize2, Minimize2, X, ChevronRight, PenTool, Save, Share2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { ManualPreview } from "@/components/ManualPreview";
 import { ImageMaskEditor } from "@/components/ImageMaskEditor";
@@ -114,10 +114,20 @@ export function EditorView() {
 
                     {/* Right: Action Buttons */}
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={reset}>
-                            Reset
+                        <Button variant="ghost" size="sm">
+                            <Save className="w-4 h-4 mr-2" />
+                            Save
                         </Button>
-                        <Button size="sm" onClick={() => window.print()}>
+                        <Button variant="outline" size="sm">
+                            <Share2 className="w-4 h-4 mr-2" />
+                            Share
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={() => window.print()}
+                            disabled={viewMode !== 'preview'}
+                            title={viewMode !== 'preview' ? "Switch to Preview to export PDF" : "Export as PDF"}
+                        >
                             <Download className="w-4 h-4 mr-2" />
                             Export PDF
                         </Button>
