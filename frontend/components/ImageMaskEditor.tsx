@@ -39,45 +39,41 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
                 const coords = m.box_2d;
                 let [ymin, xmin, ymax, xmax] = coords;
 
-                const maxVal = Math.max(ymin, xmin, ymax, xmax);
-                const isNormalizedZeroOne = maxVal <= 1.0;
-
-                const factor = isNormalizedZeroOne ? 1 : 1000;
+                // STRICTLY assume 0-1000 scale as per backend contract
+                const scaleX = image.naturalWidth / 1000;
+                const scaleY = image.naturalHeight / 1000;
 
                 // Try to preserve existing ID to maintain selection state
-                // This assumes order doesn't change, which is true for adds/edits here
                 const existingId = masks[i]?.id;
                 const id = existingId || `mask-${i}`;
 
                 return {
                     id: id,
-                    x: (xmin / factor) * image.width,
-                    y: (ymin / factor) * image.height,
-                    width: ((xmax - xmin) / factor) * image.width,
-                    height: ((ymax - ymin) / factor) * image.height,
+                    x: xmin * scaleX,
+                    y: ymin * scaleY,
+                    width: (xmax - xmin) * scaleX,
+                    height: (ymax - ymin) * scaleY,
                 };
             });
 
-            // Only update if actually different to avoid cycles? 
-            // Actually, we must update because parent is source of truth for normalized coords.
-            // But checking equality might help performance/jitter. 
-            // For now, let's just set it.
             setMasks(newMasks);
         }
-    }, [image, initialMasks]); // Relying on parent to not pass new object ref if content same? 
-    // ManualEditor creates new array on every edit. 
-    // This might cause loop: Drag -> Notify -> Parent SetState -> Prop Change -> UseEffect -> SetMasks.
-    // Ideally we break the loop if values are close enough.
+    }, [image, initialMasks]);
 
     // Handle container resize
     useEffect(() => {
         if (image && containerRef.current) {
             // Use clientWidth to exclude borders
             const containerWidth = containerRef.current.clientWidth;
-            const scale = containerWidth / image.width;
+            const containerHeight = Math.min(window.innerHeight * 0.6, containerWidth * (image.height / image.width));
+
+            // Just fit to width for now, or maintain aspect ratio?
+            // Let's maintain aspect ratio but limit height if needed?
+            // For simplicity, just width-based scaling as before.
+            const scale = containerWidth / image.naturalWidth;
             setDimensions({
                 width: containerWidth,
-                height: image.height * scale
+                height: image.naturalHeight * scale
             });
         }
     }, [image]);
@@ -141,16 +137,16 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
     const notifyUpdate = (currentMasks: Mask[]) => {
         if (!image) return;
 
-        // Convert back to normalized coordinates [ymin, xmin, ymax, xmax]
+        // Convert back to normalized coordinates [ymin, xmin, ymax, xmax] (0-1000 scale)
         const normalizedMasks = currentMasks.map(mask => {
-            const xmin = (mask.x / image.width) * 1000;
-            const ymin = (mask.y / image.height) * 1000;
-            const xmax = ((mask.x + mask.width) / image.width) * 1000;
-            const ymax = ((mask.y + mask.height) / image.height) * 1000;
+            const xmin = (mask.x / image.naturalWidth) * 1000;
+            const ymin = (mask.y / image.naturalHeight) * 1000;
+            const xmax = ((mask.x + mask.width) / image.naturalWidth) * 1000;
+            const ymax = ((mask.y + mask.height) / image.naturalHeight) * 1000;
 
             return {
                 label: 'sensitive',
-                box_2d: [ymin, xmin, ymax, xmax].map(Math.round)
+                box_2d: [ymin, xmin, ymax, xmax].map(val => Math.min(1000, Math.max(0, Math.round(val))))
             };
         });
         onUpdate(normalizedMasks);
@@ -160,10 +156,10 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
         if (!image) return;
         const newMask: Mask = {
             id: `mask-${Date.now()}`,
-            x: image.width * 0.4,
-            y: image.height * 0.4,
-            width: image.width * 0.2,
-            height: image.height * 0.1,
+            x: image.naturalWidth * 0.4,
+            y: image.naturalHeight * 0.4,
+            width: image.naturalWidth * 0.2,
+            height: image.naturalHeight * 0.1,
         };
         const newMasks = [...masks, newMask];
         setMasks(newMasks);
@@ -181,7 +177,8 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate }: ImageMaskE
 
     if (!image) return <div className="animate-pulse bg-gray-200 w-full h-64 rounded-lg"></div>;
 
-    const scale = dimensions.width / image.width;
+    // Use natural dimensions for consistent aspect ratio calculation
+    const scale = dimensions.width / image.naturalWidth;
 
     return (
         <div className="space-y-4">

@@ -75,7 +75,8 @@ class GeminiService:
         - The timestamp must be in MM:SS format (e.g., 00:05).
         - Choose the exact moment where the action is clearly visible for a screenshot.
         - "privacy_masks": List of bounding boxes for sensitive info (email, names, phone numbers, API keys, etc.).
-        - "box_2d": Normalized coordinates [ymin, xmin, ymax, xmax] where values are between 0 and 1000.
+        - "box_2d": Normalized coordinates [ymin, xmin, ymax, xmax] on a scale of 0 to 1000.
+        - IMPORTANT: Coordinates MUST be integers between 0 and 1000.
         - Respond ONLY with the JSON.
         """
         

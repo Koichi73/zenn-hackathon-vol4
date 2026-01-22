@@ -1,10 +1,11 @@
 import subprocess
+import os
 
 class VideoService:
     def __init__(self):
         pass
 
-    async def extract_frames(self, video_path: str, steps: list, output_dir: str = "static/images"):
+    async def extract_frames(self, video_path: str, steps: list, output_dir: str = "app/static/images"):
         """
         Extracts frames from the video at the given timestamps.
         
@@ -16,7 +17,6 @@ class VideoService:
         Returns:
             List of steps with an added 'image_url' field.
         """
-        import os
         
         # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
@@ -31,7 +31,7 @@ class VideoService:
                 
             # Create a safe filename
             # cleaner timestamp for filename
-            clean_ts = timestamp.replace(":", "-")
+            clean_ts = timestamp.replace(":", "-").replace(".", "_")
             image_filename = f"step_{i+1}_{clean_ts}.jpg"
             image_path = os.path.join(output_dir, image_filename)
             
@@ -44,6 +44,7 @@ class VideoService:
                 "-ss", timestamp,
                 "-i", video_path,
                 "-vframes", "1",
+                "-q:v", "2", # High quality jpeg
                 "-y",
                 image_path
             ]
@@ -57,25 +58,12 @@ class VideoService:
                 )
                 
                 # Assuming static files are served from /static/images/
-                # We need to return the URL path relative to the domain
-                # The mounting point in main.py will likely be "/static" pointing to "static" dir.
-                # So if we verify file is at backend/static/images/foo.jpg, and we mount backend/static -> /static
-                # URL is /static/images/foo.jpg
+                # We hardcode the URL path to match the mount point in main.py
+                # This assumes output_dir ends in "images" or is the mounted directory.
                 
-                # However, the output_dir passed in might be absolute or relative. 
-                # Let's clean up the path for the URL.
-                
-                # If output_dir is "static/images", then url is "/static/images/..."
-                
-                # We will normalize to return the relative path that the frontend can use
-                # based on how we mount in main.py. 
-                # Let's assume standard conventions: 
-                # If saved to 'app/static/images', and we mount 'app/static' to '/static', 
-                # then URL is '/static/images/filename'.
-                
-                # For this implementation, let's allow the caller to handle full URL construction 
-                # or just return the filename/relative path.
-                # Returning the relative web path seems most useful.
+                # For MVP, we know endpoints.py passes app/static/images
+                # and main.py mounts app/static to /static.
+                # So the file at app/static/images/foo.jpg is accessible at /static/images/foo.jpg
                 
                 step["image_url"] = f"/static/images/{image_filename}"
                 

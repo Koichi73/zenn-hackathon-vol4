@@ -33,17 +33,8 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
             const masksParam = urlObj.searchParams.get('masks');
             if (masksParam) {
                 masks = JSON.parse(decodeURIComponent(masksParam));
-                // Remove param for the actual image src, or keep it? 
-                // HTML img src works with extra params usually.
-                // But for cleanliness/caching, maybe keep it.
-                // However, we want to show the image. 
-                // Let's keep cleanSrc as is (with params) or strip?
-                // If the backend ignores params, it's fine.
-                // Let's strip the masks param for the <img> tag just in case.
                 urlObj.searchParams.delete('masks');
                 cleanSrc = urlObj.toString();
-                // If it was relative, toString might make it absolute. 
-                // That's generally fine.
             }
         } catch (e) {
             console.error("Failed to parse masks from URL", e);
