@@ -122,14 +122,7 @@ class GeminiService:
                     temperature=self.temperature,
                 )
             )
-
-            parsed_response = response.parsed
-            
-            # Debug log
-            if parsed_response:
-                print(parsed_response.model_dump())
-            
-            return parsed_response
+            return response.parsed
         except Exception as e:
             print(f"Error in Phase 1: {e}")
             return []
