@@ -32,7 +32,34 @@ export function EditorView() {
 
     const handleMaskUpdate = (stepIndex: number, newMasks: any[]) => {
         const step = getStep(stepIndex);
-        updateStep(stepIndex, { ...step, masks: newMasks, privacy_masks: newMasks }); // Update both for compat
+
+        // Split combined masks back into highlight_box and mask_boxes
+        const highlightMask = newMasks.find(m => m.type === 'highlight');
+        const privacyMasks = newMasks.filter(m => m.type === 'privacy' || !m.type).map(m => ({
+            label: m.label || 'privacy',
+            box: {
+                ymin: m.box_2d[0],
+                xmin: m.box_2d[1],
+                ymax: m.box_2d[2],
+                xmax: m.box_2d[3]
+            }
+        }));
+
+        let highlight_box = undefined;
+        if (highlightMask) {
+            highlight_box = {
+                ymin: highlightMask.box_2d[0],
+                xmin: highlightMask.box_2d[1],
+                ymax: highlightMask.box_2d[2],
+                xmax: highlightMask.box_2d[3]
+            };
+        }
+
+        updateStep(stepIndex, {
+            ...step,
+            highlight_box: highlight_box,
+            mask_boxes: privacyMasks
+        });
     };
 
     const scrollToStep = (index: number) => {
@@ -52,9 +79,28 @@ export function EditorView() {
 
                 // Encode masks into the URL for the preview renderer
                 let imageUrlForMarkdown = fullImageUrl;
-                const masks = step.masks || step.privacy_masks;
-                if (masks && masks.length > 0) {
-                    const masksJson = JSON.stringify(masks);
+
+                // Combine highlight_box and mask_boxes for preview rendering (which expects a flat list)
+                const combinedMasks = [];
+                if (step.highlight_box) {
+                    combinedMasks.push({
+                        type: 'highlight',
+                        label: 'highlight',
+                        box_2d: [step.highlight_box.ymin, step.highlight_box.xmin, step.highlight_box.ymax, step.highlight_box.xmax]
+                    });
+                }
+                if (step.mask_boxes) {
+                    step.mask_boxes.forEach((m: any) => {
+                        combinedMasks.push({
+                            type: 'privacy',
+                            label: m.label,
+                            box_2d: [m.box.ymin, m.box.xmin, m.box.ymax, m.box.xmax]
+                        });
+                    });
+                }
+
+                if (combinedMasks.length > 0) {
+                    const masksJson = JSON.stringify(combinedMasks);
                     const encodedMasks = encodeURIComponent(masksJson);
                     imageUrlForMarkdown = `${fullImageUrl}?masks=${encodedMasks}`;
                 }
@@ -62,11 +108,8 @@ export function EditorView() {
                 md += `![Step ${index + 1} Image](${imageUrlForMarkdown})\n`;
 
                 // Add note about masked areas if present
-                if (masks && masks.length > 0) {
-                    const privacyCount = masks.filter((m: any) => !m.type || m.type === 'privacy').length;
-                    if (privacyCount > 0) {
-                        md += `\n> [!NOTE]\n> This image contains ${privacyCount} masked area(s) for privacy.\n`;
-                    }
+                if (step.mask_boxes && step.mask_boxes.length > 0) {
+                    md += `\n> [!NOTE]\n> This image contains ${step.mask_boxes.length} masked area(s) for privacy.\n`;
                 }
                 md += `\n`;
             }
@@ -201,7 +244,18 @@ export function EditorView() {
                                                         {step.image_url ? (
                                                             <ImageMaskEditor
                                                                 imageUrl={`http://localhost:8000${step.image_url}`}
-                                                                initialMasks={step.masks || step.privacy_masks || []}
+                                                                initialMasks={[
+                                                                    ...(step.highlight_box ? [{
+                                                                        type: 'highlight',
+                                                                        label: 'highlight',
+                                                                        box_2d: [step.highlight_box.ymin, step.highlight_box.xmin, step.highlight_box.ymax, step.highlight_box.xmax]
+                                                                    } as any] : []),
+                                                                    ...(step.mask_boxes ? step.mask_boxes.map((m: any) => ({
+                                                                        type: 'privacy',
+                                                                        label: m.label,
+                                                                        box_2d: [m.box.ymin, m.box.xmin, m.box.ymax, m.box.xmax]
+                                                                    })) : [])
+                                                                ]}
                                                                 onUpdate={(newMasks) => handleMaskUpdate(index, newMasks)}
                                                             />
                                                         ) : (

@@ -19,24 +19,21 @@ DUMMY_RESPONSE = [
         "timestamp": "00:03",
         "description": "Drag and drop the video file into the upload area.",
         "highlight_box": {"ymin": 0, "xmin": 0, "ymax": 0, "xmax": 0},
-        "mask_boxes": [],
-        "masks": []
+        "mask_boxes": []
     },
     {
         "title": "Wait for processing",
         "timestamp": "00:08",
         "description": "The system analyzes the video and extracts steps.",
         "highlight_box": {"ymin": 0, "xmin": 0, "ymax": 0, "xmax": 0},
-        "mask_boxes": [],
-        "masks": []
+        "mask_boxes": []
     },
     {
         "title": "Review manual",
         "timestamp": "00:15",
         "description": "Check the generated markdown guide.",
         "highlight_box": {"ymin": 0, "xmin": 0, "ymax": 0, "xmax": 0},
-        "mask_boxes": [],
-        "masks": []
+        "mask_boxes": []
     }
 ]
 

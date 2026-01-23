@@ -7,8 +7,21 @@ interface Step {
   description: string;
   timestamp: string;
   image_url: string | null;
-  privacy_masks?: any[];
-  masks?: any[];
+  highlight_box?: {
+    ymin: number;
+    xmin: number;
+    ymax: number;
+    xmax: number;
+  };
+  mask_boxes?: Array<{
+    label: string;
+    box: {
+      ymin: number;
+      xmin: number;
+      ymax: number;
+      xmax: number;
+    };
+  }>;
   [key: string]: any;
 }
 

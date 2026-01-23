@@ -3,7 +3,7 @@ from google.genai import types
 import os
 import json
 import asyncio
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from dotenv import load_dotenv
 
@@ -37,41 +37,6 @@ class ManualStep(BaseModel):
     highlight_box: BoundingBox
     mask_boxes: List[MaskItem]
     image_url: Optional[str] = None # Added field for image URL
-
-    @computed_field
-    @property
-    def masks(self) -> List[dict]:
-        """
-        Legacy support for frontend which expects 'masks' list with 'box_2d'.
-        Combines highlight_box and mask_boxes.
-        """
-        items = []
-        # Add highlight
-        if self.highlight_box:
-            items.append({
-                "label": "highlight",
-                "box_2d": [
-                    self.highlight_box.ymin, 
-                    self.highlight_box.xmin, 
-                    self.highlight_box.ymax, 
-                    self.highlight_box.xmax
-                ],
-                "type": "highlight"
-            })
-        
-        # Add privacy masks
-        for m in self.mask_boxes:
-            items.append({
-                "label": m.label,
-                "box_2d": [
-                    m.box.ymin, 
-                    m.box.xmin, 
-                    m.box.ymax, 
-                    m.box.xmax
-                ],
-                "type": "privacy"
-            })
-        return items
 
 # --- Service ---
 
