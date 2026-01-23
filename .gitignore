@@ -1,5 +1,6 @@
 # General
 .DS_Store
+_archive/
 
 # Python / Backend
 __pycache__/

@@ -16,18 +16,27 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 DUMMY_RESPONSE = [
     {
         "title": "Upload video",
+        "timestamp": "00:03",
         "description": "Drag and drop the video file into the upload area.",
-        "timestamp": "00:03"
+        "highlight_box": {"ymin": 0, "xmin": 0, "ymax": 0, "xmax": 0},
+        "mask_boxes": [],
+        "masks": []
     },
     {
         "title": "Wait for processing",
+        "timestamp": "00:08",
         "description": "The system analyzes the video and extracts steps.",
-        "timestamp": "00:08"
+        "highlight_box": {"ymin": 0, "xmin": 0, "ymax": 0, "xmax": 0},
+        "mask_boxes": [],
+        "masks": []
     },
     {
         "title": "Review manual",
+        "timestamp": "00:15",
         "description": "Check the generated markdown guide.",
-        "timestamp": "00:15"
+        "highlight_box": {"ymin": 0, "xmin": 0, "ymax": 0, "xmax": 0},
+        "mask_boxes": [],
+        "masks": []
     }
 ]
 
@@ -42,24 +51,16 @@ async def process_video(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, buffer)
             
         # 1. Process with Gemini (Real Implementation)
+        steps = []
         try:
             gemini_service = GeminiService()
-            steps = await gemini_service.analyze_video(file_path)
+            video_service = VideoService()
+            # The service now handles video structure, image extraction, and detail analysis
+            steps = await gemini_service.generate_manual_from_video(file_path, video_service)
         except Exception as e:
             print(f"Gemini Error: {e}")
             # Fallback for dev without quota
             steps = DUMMY_RESPONSE
-        
-        # 2. Extract Frames
-        try:
-            video_service = VideoService()
-            # We are saving to app/static/images. 
-            # Mounting point is /static -> app/static.
-            # So images should be in app/static/images.
-            steps = await video_service.extract_frames(file_path, steps, output_dir="app/static/images")
-        except Exception as e:
-            print(f"Video Extraction Error: {e}")
-            # If extraction fails, steps will just lack image_url or have it as None
         
         # 3. Format Response
         return {
@@ -68,6 +69,8 @@ async def process_video(file: UploadFile = File(...)):
             "filename": file.filename,
             "steps": steps
         }
+
+        
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
