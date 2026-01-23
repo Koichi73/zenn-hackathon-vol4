@@ -20,8 +20,8 @@ echo "[Backend] Starting..."
 cd "$PROJECT_ROOT/backend"
 
 # 仮想環境のuvicornを使用する
-if [ -f "../.venv/bin/uvicorn" ]; then
-    ../.venv/bin/uvicorn app.main:app --reload --port 8000 &
+if [ -f ".venv/bin/uvicorn" ]; then
+    .venv/bin/uvicorn app.main:app --reload --port 8000 &
 else
     echo "[Backend] Warning: .venv/bin/uvicorn not found. Using system uvicorn."
     uvicorn app.main:app --reload --port 8000 &

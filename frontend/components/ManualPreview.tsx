@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check, Printer } from 'lucide-react';
 
@@ -20,29 +22,65 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
         window.print();
     };
 
+    const ImageRenderer: Components['img'] = ({ src, alt }) => {
+        if (!src || typeof src !== 'string') return null;
+
+        let masks: any[] = [];
+        let cleanSrc = src;
+
+        try {
+            const urlObj = new URL(src, window.location.origin); // Handle relative URLs
+            const masksParam = urlObj.searchParams.get('masks');
+            if (masksParam) {
+                masks = JSON.parse(decodeURIComponent(masksParam));
+                urlObj.searchParams.delete('masks');
+                cleanSrc = urlObj.toString();
+            }
+        } catch (e) {
+            console.error("Failed to parse masks from URL", e);
+        }
+
+        return (
+            <span className="relative inline-block max-w-full">
+                <img src={cleanSrc} alt={alt} className="max-w-full h-auto rounded-lg shadow-sm" />
+                {masks.map((mask, i) => {
+                    if (!mask.box_2d) return null;
+                    const [ymin, xmin, ymax, xmax] = mask.box_2d;
+                    const isHighlight = mask.type === 'highlight';
+
+                    return (
+                        <span
+                            key={i}
+                            className={`absolute ${isHighlight
+                                ? "border-4 border-red-600 bg-transparent"
+                                : "bg-black/80" // Privacy mask: dark, no border
+                                }`}
+                            style={{
+                                top: `${ymin / 10}%`,
+                                left: `${xmin / 10}%`,
+                                width: `${(xmax - xmin) / 10}%`,
+                                height: `${(ymax - ymin) / 10}%`,
+                            }}
+                            title={mask.label || (isHighlight ? "Button Highlight" : "Privacy Mask")}
+                        />
+                    );
+                })}
+            </span>
+        );
+    };
+
     return (
         <div className="w-full max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden border print:shadow-none print:border-none">
             <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center print:hidden">
                 <h2 className="font-semibold text-gray-700">Generated Manual</h2>
-                <div className="flex gap-2">
-                    <button
-                        onClick={handlePrint}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                        <Printer className="w-4 h-4" />
-                        Print / PDF
-                    </button>
-                    <button
-                        onClick={handleCopy}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-transparent rounded hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        {copied ? 'Copied!' : 'Copy Markdown'}
-                    </button>
-                </div>
             </div>
             <div className="p-8 prose max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                        img: ImageRenderer
+                    }}
+                >
                     {markdown}
                 </ReactMarkdown>
             </div>
