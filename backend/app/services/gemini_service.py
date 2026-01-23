@@ -1,7 +1,7 @@
 from google import genai
 from google.genai import types
 import os
-import json
+from pathlib import Path
 import asyncio
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -56,13 +56,14 @@ class GeminiService:
         )
         
         self.model_name = os.getenv("MODEL_NAME", "gemini-3-flash-preview")
+        self.temperature = 1.0 if self.model_name == "gemini-3-flash-preview" else 0.0
 
     async def generate_manual_from_video(self, video_path: str, video_service) -> List[ManualStep]:
         """
         Main pipeline:
-        1. Phase 1: Analyze video structure (timestamps & titles)
-        2. Phase 2: Extract images using VideoService
-        3. Phase 3: Analyze images for details (masks, descriptions)
+            1. Analyze video structure (timestamps & titles)
+            2. Extract images using VideoService
+            3. Analyze images for details (masks, highlight, descriptions)
         """
         print(f"Starting analysis for: {video_path}")
 
@@ -76,13 +77,9 @@ class GeminiService:
         print(f"Phase 1 complete. Found {len(structures)} steps.")
 
         # Phase 2: Image Extraction
-        # VideoService expects a list of dicts with 'timestamp'
-        # We need to adapt the input for VideoService
         steps_for_extraction = [s.model_dump() for s in structures]
         
         print("Phase 2: Extracting images...")
-        # Note: video_service.extract_frames is async
-        # It updates the list in-place or returns a new list with 'image_url'
         steps_with_images = await video_service.extract_frames(video_path, steps_for_extraction)
         
         # Verify images were extracted
@@ -121,14 +118,18 @@ class GeminiService:
                 contents=[video_part, prompt],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_schema=list[StepStructure]
+                    response_schema=list[StepStructure],
+                    temperature=self.temperature,
                 )
             )
-            # The SDK with response_schema should return a parsed object if we used `parsed` property?
-            # Or currently strictly returns text. Converting text to objects.
-            # Using 'response.text' and generic json loading for robustness if SDK version varies.
-            data = json.loads(response.text)
-            return [StepStructure(**item) for item in data]
+
+            parsed_response = response.parsed
+            
+            # Debug log
+            if parsed_response:
+                print(parsed_response.model_dump())
+            
+            return parsed_response
         except Exception as e:
             print(f"Error in Phase 1: {e}")
             return []
@@ -143,24 +144,8 @@ class GeminiService:
             title = step.get("title")
             timestamp = step.get("timestamp")
             
-            # The image_url is like "/static/images/..."
-            # We need the absolute path to read the file content.
-            # Assuming standard path structure: app/static/images/...
-            # We need to map URL back to file path.
-            # step['image_url'] comes from VideoService which sets it to /static/images/...
-            # We can reconstruct valid file path relative to project root or use what we know.
-            
             # Helper to resolve path
-            # TODO: Make this robust. Assuming running from backend root.
-            relative_path = image_url.lstrip("/") # static/images/...
-            # If running from backend directory, 'app/static/images' might be the physical path
-            # The url is '/static/images/...', physical is 'app/static/images/...'
-            # Let's try to infer from 'app' + url if it starts with /static
-            
-            if image_url.startswith("/static/"):
-                file_path = f"app{image_url}"
-            else:
-                file_path = image_url # Fallback
+            file_path = self._resolve_image_path(image_url)
             
             tasks.append(self._analyze_single_image(file_path, title, timestamp, image_url))
 
@@ -189,23 +174,25 @@ class GeminiService:
                 contents=[image_part, prompt],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_schema=StepDetail
+                    response_schema=StepDetail,
+                    temperature=self.temperature,
                 )
             )
             
-            detail_data = json.loads(response.text)
-            detail = StepDetail(**detail_data)
-
-            print(detail_data)
+            parsed_response = response.parsed
+            
+            # Debug log
+            if parsed_response:
+                print(parsed_response.model_dump())
             
             try:
                 # Create ManualStep and ensure validation passes
                 step = ManualStep(
                     timestamp=timestamp,
                     title=title,
-                    description=detail.description,
-                    highlight_box=detail.highlight_box,
-                    mask_boxes=detail.mask_boxes,
+                    description=parsed_response.description,
+                    highlight_box=parsed_response.highlight_box,
+                    mask_boxes=parsed_response.mask_boxes,
                     image_url=image_url
                 )
                 return step
@@ -216,4 +203,18 @@ class GeminiService:
         except Exception as e:
             print(f"Error in Phase 3 for {title}: {e}")
             return None
+    
+    def _resolve_image_path(self, image_url: str) -> str:
+        """
+        Resolves the absolute file system path from the image URL.
+        """
+        if not image_url:
+            return ""
+
+        if image_url.startswith("/static/"):
+            app_dir = Path(__file__).resolve().parent.parent
+            relative_path = image_url.lstrip("/")
+            return str(app_dir / relative_path)
+        
+        return image_url
 

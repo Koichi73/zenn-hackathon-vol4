@@ -1,27 +1,25 @@
 VIDEO_ANALYSIS_PROMPT = """
-    Analyze the video and extract the sequence of operations.
-    For each step, identify a short 'title' and the best 'timestamp' to take a screenshot.
+動画を分析し、操作のシーケンスを抽出します。
+各ステップについて、短い「タイトル」とスクリーンショットを撮るのに最適な「タイムスタンプ」を特定してください。
 
-    CRITICAL INSTRUCTIONS FOR TIMESTAMP SELECTION:
-    - Choose the moment BEFORE the action is completed, but clearly visible.
-    - The screen must be CLEAN.
-    - AVOID timestamps where "password save popups", "tooltips", or "loading spinners" obscure the UI.
-    - If a popup appears after a click, select the frame JUST BEFORE the click or BEFORE the popup appears.
-    
-    Output a list of StepStructure objects.
-    """
+タイムスタンプ選択に関する重要指示：
+
+アクションが完了する直前で、かつ明確に視認できる時点を選択してください。
+画面は「クリーン」である必要があります。
+「パスワード保存ポップアップ」、「ツールチップ」、「ローディングスピナー」などがUIを隠しているタイムスタンプは避けてください。
+クリック後にポップアップが表示される場合は、クリック直前、またはポップアップが表示される直前のフレームを選択してください。
+StepStructureオブジェクトのリストとして出力してください。
+"""
 
 IMAGE_ANALYSIS_PROMPT = """
-    Analyze this UI screenshot for a manual step titled: "{title}".
-    
-    1. Identify the UI element (button, link, field) related to "{title}".
-       - Return its bounding box as 'highlight_box'.
-    
-    2. Identify detailed masking requirements.
-       - Find ALL personal information (PII) such as email addresses, names, IDs.
-       - Return a list of 'mask_boxes', each with a 'label' and 'box'.
-    
-    3. Write a detailed instruction description in Japanese.
-    
-    Input Title: {title}
-    """
+「{title}」というタイトルの手動ステップのUIスクリーンショットを分析してください。
+
+1. 「{title}」に関連するUI要素（ボタン、リンク、フィールド）を特定します。
+   - その境界ボックスを「highlight_box」として返してください。
+2. 詳細なマスキング要件を特定します。
+   - メールアドレス、氏名、IDなどの個人情報（PII）をすべて見つけてください。
+   - 各要素に「label」と「box」を持つ「mask_boxes」のリストを返してください。
+3. 詳細な手順説明を日本語で記述してください。
+
+入力タイトル：{title}
+"""
