@@ -7,8 +7,24 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from dotenv import load_dotenv
 from app.services.prompts import VIDEO_ANALYSIS_PROMPT, IMAGE_ANALYSIS_PROMPT
+import time
+import logging
 
 load_dotenv()
+
+# --- Logging Setup ---
+logger = logging.getLogger("performance")
+logger.setLevel(logging.INFO)
+
+# File handler (コメントアウト解除でログファイルへ出力)
+# file_handler = logging.FileHandler("performance.log")
+# file_handler.setFormatter(logging.Formatter('%(message)s'))
+# logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter('%(message)s'))
+logger.addHandler(console_handler)
 
 # --- Pydantic Models ---
 
@@ -111,6 +127,9 @@ class GeminiService:
         )
 
         prompt = VIDEO_ANALYSIS_PROMPT
+        
+        start_time = time.time()
+        logger.info("START: analyze_video_structure")
 
         try:
             # Run blocking API call in thread
@@ -124,8 +143,13 @@ class GeminiService:
                     temperature=self.temperature,
                 )
             )
+            
+            duration = time.time() - start_time
+            logger.info(f"END: analyze_video_structure. Duration: {duration:.4f}s")
+            
             return response.parsed
         except Exception as e:
+            logger.error(f"Error in analyze_video_structure: {e}")
             print(f"Error in Phase 1: {e}")
             return []
 
@@ -139,6 +163,7 @@ class GeminiService:
             title = step.get("title")
             timestamp = step.get("timestamp")
             
+
             # Helper to resolve path
             file_path = self.resolve_image_path(image_url)
             
@@ -163,6 +188,9 @@ class GeminiService:
             )
 
             prompt = IMAGE_ANALYSIS_PROMPT.format(title=title)
+            
+            start_time = time.time()
+            logger.info(f"START: analyze_single_image for step '{title}'")
 
             # Run blocking API call in thread
             response = await asyncio.to_thread(
@@ -175,6 +203,9 @@ class GeminiService:
                     temperature=self.temperature,
                 )
             )
+            
+            duration = time.time() - start_time
+            logger.info(f"END: analyze_single_image for step '{title}'. Duration: {duration:.4f}s")
             
             parsed_response = response.parsed
             
