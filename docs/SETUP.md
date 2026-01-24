@@ -82,6 +82,7 @@ cp .env.template .env
 PROJECT_ID=<YOUR_PROJECT_ID>
 LOCATION=global
 MODEL_NAME=gemini-1.5-flash-002
+BUCKET_NAME=<YOUR_BUCKET_ID>
 ```
 * `MODEL_NAME`: 利用したいGeminiのモデル名を指定してください（例: `gemini-1.5-flash-002` など）。
 
