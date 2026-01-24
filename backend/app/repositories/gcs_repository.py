@@ -34,6 +34,16 @@ class GCSRepository:
         blob = self.bucket.blob(blob_name)
         blob.delete()
 
+    # 文字列やバイトデータを直接アップロード
+    def upload_structure_content(self, content: str, destination_blob_name: str, content_type: str = "text/plain") -> str:
+        """
+        コンテンツを直接GCSにアップロード
+        returns: アップロードしたファイルの公開URL
+        """
+        blob = self.bucket.blob(destination_blob_name)
+        blob.upload_from_string(content, content_type=content_type)
+        return blob.public_url
+
 # 使用例
 # # GCSに動画をアップロード
 #     try:
