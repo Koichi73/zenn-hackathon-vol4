@@ -30,6 +30,7 @@ interface VideoContextType {
   filename: string;
   isProcessing: boolean;
   error: string | null;
+  videoUrl: string | null;
   processVideo: (file: File) => Promise<void>;
   updateStep: (index: number, updatedStep: Step) => void;
   reset: () => void;
@@ -42,12 +43,17 @@ export function VideoProvider({ children }: { children: ReactNode }) {
   const [filename, setFilename] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const processVideo = async (file: File) => {
     setIsProcessing(true);
     setError(null);
     setSteps(null);
     setFilename(file.name);
+
+    // ローカルプレビューURL作成
+    const url = URL.createObjectURL(file);
+    setVideoUrl(url);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -141,6 +147,10 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     setSteps(null);
     setFilename("");
     setError(null);
+    if (videoUrl) {
+      URL.revokeObjectURL(videoUrl);
+    }
+    setVideoUrl(null);
   };
 
   return (
@@ -150,6 +160,7 @@ export function VideoProvider({ children }: { children: ReactNode }) {
         filename,
         isProcessing,
         error,
+        videoUrl,
         processVideo,
         updateStep,
         reset,

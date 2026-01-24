@@ -12,12 +12,17 @@ import { ImageMaskEditor } from "@/components/ImageMaskEditor";
 import { cn } from "@/lib/utils";
 
 export function EditorView() {
-    const { steps, filename, updateStep, reset, isProcessing } = useVideo();
+    const { steps, filename, updateStep, reset, isProcessing, videoUrl } = useVideo();
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
 
     // Video widget state
     const [isVideoWidgetOpen, setIsVideoWidgetOpen] = useState(true);
     const [isVideoWidgetExpanded, setIsVideoWidgetExpanded] = useState(true);
+
+    // Video ref
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
 
     // Refs for scrolling to steps
     const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -66,6 +71,41 @@ export function EditorView() {
 
     const scrollToStep = (index: number) => {
         stepRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    const handleTimeUpdate = () => {
+        if (videoRef.current) {
+            setCurrentTime(videoRef.current.currentTime);
+        }
+    };
+
+    const handleLoadedMetadata = () => {
+        if (videoRef.current) {
+            setDuration(videoRef.current.duration);
+        }
+    };
+
+    const formatTime = (time: number) => {
+        const minutes = Math.floor(time / 60);
+        const seconds = Math.floor(time % 60);
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    };
+
+    const convertTimestampToSeconds = (timestamp: string) => {
+        const parts = timestamp.split(':').map(Number);
+        if (parts.length === 2) {
+            return parts[0] * 60 + parts[1];
+        } else if (parts.length === 3) {
+            return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+        return 0;
+    };
+
+    const handleStepClick = (timestamp: string) => {
+        if (videoRef.current) {
+            videoRef.current.currentTime = convertTimestampToSeconds(timestamp);
+            videoRef.current.play();
+        }
     };
 
     const generateMarkdown = () => {
@@ -242,7 +282,10 @@ export function EditorView() {
                                 {steps.map((step, index) => (
                                     <button
                                         key={index}
-                                        onClick={() => scrollToStep(index)}
+                                        onClick={() => {
+                                            scrollToStep(index);
+                                            handleStepClick(step.timestamp);
+                                        }}
                                         className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors truncate flex items-center gap-2"
                                     >
                                         <span className="flex items-center justify-center w-5 h-5 rounded-full bg-slate-200 text-xs font-medium text-slate-600 shrink-0">
@@ -340,7 +383,7 @@ export function EditorView() {
                         </div>
 
                         {/* Floating Video Widget (Hidden on Print) */}
-                        {isVideoWidgetOpen && (
+                        {isVideoWidgetOpen && videoUrl && (
                             <div className={cn(
                                 "fixed bottom-6 right-6 z-50 transition-all duration-300 ease-in-out bg-white shadow-2xl rounded-xl border border-slate-200 overflow-hidden print:hidden",
                                 isVideoWidgetExpanded ? "w-[360px]" : "w-[200px]"
@@ -367,30 +410,33 @@ export function EditorView() {
                                     </div>
                                 </div>
 
-                                {/* Widget Content */}
+                                {/* Video Player */}
                                 <div className={cn(
                                     "bg-slate-900 transition-all duration-300 relative",
                                     isVideoWidgetExpanded ? "aspect-video" : "h-12"
                                 )}>
-                                    {isVideoWidgetExpanded ? (
-                                        <div className="absolute inset-0 flex items-center justify-center text-white/50">
-                                            <Play className="w-12 h-12 opacity-50" />
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center justify-center h-full text-white/70 text-xs gap-2">
-                                            <Play className="w-3 h-3" /> 00:15 / 03:00
-                                        </div>
-                                    )}
+                                    <video
+                                        ref={videoRef}
+                                        src={videoUrl}
+                                        className="w-full h-full"
+                                        onTimeUpdate={handleTimeUpdate}
+                                        onLoadedMetadata={handleLoadedMetadata}
+                                        controls={isVideoWidgetExpanded}
+                                    />
                                 </div>
 
+                                {/* Progress Bar & Time Display */}
                                 {isVideoWidgetExpanded && (
                                     <div className="p-3 bg-white">
                                         <div className="w-full bg-slate-100 rounded-full h-1 mb-2">
-                                            <div className="bg-indigo-600 h-1 rounded-full w-1/3"></div>
+                                            <div
+                                                className="bg-indigo-600 h-1 rounded-full transition-all"
+                                                style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                                            />
                                         </div>
                                         <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                                            <span>00:15</span>
-                                            <span>03:00</span>
+                                            <span>{formatTime(currentTime)}</span>
+                                            <span>{formatTime(duration)}</span>
                                         </div>
                                     </div>
                                 )}
