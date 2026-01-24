@@ -21,12 +21,12 @@ export default function DashboardPage() {
 
     // Redirect to editor when steps are available (and we are in upload flow)
     useEffect(() => {
-        if (steps && !isProcessing && isUploadOpen) {
+        if (steps && isUploadOpen) {
             setIsUploadOpen(false);
             // Use a specific ID or just 'new' for now since we don't have persistence
             router.push("/editor/new");
         }
-    }, [steps, isProcessing, isUploadOpen, router]);
+    }, [steps, isUploadOpen, router]);
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();

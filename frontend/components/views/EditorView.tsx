@@ -273,7 +273,7 @@ export function EditorView() {
                                                         Description
                                                     </div>
                                                     <Textarea
-                                                        value={step.description}
+                                                        value={step.description || ''}
                                                         onChange={(e) => handleDescriptionChange(index, e.target.value)}
                                                         placeholder="Describe this step..."
                                                         className="min-h-[100px] resize-none text-base border-slate-200 focus-visible:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors"
