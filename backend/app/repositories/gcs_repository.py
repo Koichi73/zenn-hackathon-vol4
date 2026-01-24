@@ -1,10 +1,10 @@
-# gcsを扱う共通クラス
+# GCS操作用クラス
 import os
 from google.cloud import storage
 from dotenv import load_dotenv
 
 load_dotenv()
-class GCSUtils:
+class GCSRepository:
     # GCSクライアントの初期化
     def __init__(self):
         self.project_id = os.getenv("PROJECT_ID")
