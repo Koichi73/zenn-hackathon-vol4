@@ -69,7 +69,7 @@ class GeminiService:
 
         # Phase 1: Video Structure
         print("Phase 1: Analyzing video structure...")
-        structures = await self._analyze_video_structure(video_path)
+        structures = await self.analyze_video_structure(video_path)
         if not structures:
             print("Phase 1 failed: No structure found.")
             return []
@@ -98,7 +98,7 @@ class GeminiService:
         print("Phase 3 complete.")
         return final_steps
 
-    async def _analyze_video_structure(self, video_path: str) -> List[StepStructure]:
+    async def analyze_video_structure(self, video_path: str) -> List[StepStructure]:
         """
         Phase 1: Video to Structure (Timestamps & Titles)
         """
@@ -113,7 +113,9 @@ class GeminiService:
         prompt = VIDEO_ANALYSIS_PROMPT
 
         try:
-            response = self.client.models.generate_content(
+            # Run blocking API call in thread
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
                 model=self.model_name,
                 contents=[video_part, prompt],
                 config=types.GenerateContentConfig(
@@ -138,15 +140,15 @@ class GeminiService:
             timestamp = step.get("timestamp")
             
             # Helper to resolve path
-            file_path = self._resolve_image_path(image_url)
+            file_path = self.resolve_image_path(image_url)
             
-            tasks.append(self._analyze_single_image(file_path, title, timestamp, image_url))
+            tasks.append(self.analyze_single_image(file_path, title, timestamp, image_url))
 
         results = await asyncio.gather(*tasks)
         # Filter out Nones
         return [r for r in results if r is not None]
 
-    async def _analyze_single_image(self, file_path: str, title: str, timestamp: str, image_url: str) -> Optional[ManualStep]:
+    async def analyze_single_image(self, file_path: str, title: str, timestamp: str, image_url: str) -> Optional[ManualStep]:
         try:
             if not os.path.exists(file_path):
                  print(f"Image not found: {file_path}")
@@ -162,7 +164,9 @@ class GeminiService:
 
             prompt = IMAGE_ANALYSIS_PROMPT.format(title=title)
 
-            response = self.client.models.generate_content(
+            # Run blocking API call in thread
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
                 model=self.model_name,
                 contents=[image_part, prompt],
                 config=types.GenerateContentConfig(
@@ -197,7 +201,7 @@ class GeminiService:
             print(f"Error in Phase 3 for {title}: {e}")
             return None
     
-    def _resolve_image_path(self, image_url: str) -> str:
+    def resolve_image_path(self, image_url: str) -> str:
         """
         Resolves the absolute file system path from the image URL.
         """

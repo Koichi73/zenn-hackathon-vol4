@@ -53,8 +53,8 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     formData.append("file", file);
 
     try {
-      // Assuming backend is proxy-mapped or CORS allowed on localhost:8000
-      const response = await fetch("http://localhost:8000/api/process-video", {
+      // Use process-video-stream for SSE
+      const response = await fetch("http://localhost:8000/api/process-video-stream", {
         method: "POST",
         body: formData,
       });
@@ -63,12 +63,68 @@ export function VideoProvider({ children }: { children: ReactNode }) {
         throw new Error(`Error: ${response.statusText}`);
       }
 
-      const data = await response.json();
-      setSteps(data.steps);
+      if (!response.body) {
+        throw new Error("ReadableStream not supported in this browser.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      // Loop to read stream
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        // Decode chunk and add to buffer
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        // Process lines in buffer
+        const lines = buffer.split("\n\n"); // SSE events are separated by double newline
+        // Keep the last partial line in buffer
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine.startsWith("data: ")) continue;
+
+          const jsonStr = trimmedLine.replace("data: ", "");
+          try {
+            const data = JSON.parse(jsonStr);
+            console.log("SSE Event:", data);
+
+            if (data.type === "init") {
+              // Initialize steps structure
+              setSteps(data.steps);
+            } else if (data.type === "update") {
+              // Update specific step
+              setSteps((prevSteps) => {
+                if (!prevSteps) return prevSteps;
+                const newSteps = [...prevSteps];
+                // Merge existing step data with new details (e.g. keep timestamp/title if needed, or overwrite)
+                // The update sends the full detailed step
+                newSteps[data.index] = {
+                  ...newSteps[data.index],
+                  ...data.step
+                };
+                return newSteps;
+              });
+            } else if (data.type === "complete") {
+              console.log("Processing complete");
+            } else if (data.type === "error") {
+              setError(data.message || "Unknown error during streaming");
+            }
+          } catch (e) {
+            console.error("Error parsing SSE JSON:", e);
+          }
+        }
+      }
+
     } catch (err) {
+      console.error(err);
       setError(err instanceof Error ? err.message : "Failed to upload video");
-      // For dev/testing without backend connection, could uncomment below:
-      // setSteps(DUMMY_STEPS); 
     } finally {
       setIsProcessing(false);
     }

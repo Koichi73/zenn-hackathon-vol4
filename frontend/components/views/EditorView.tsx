@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Cast as MaskIcon, Play, Maximize2, Minimize2, X, ChevronRight, PenTool, Save, Share2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { ManualPreview } from "@/components/ManualPreview";
@@ -11,7 +12,7 @@ import { ImageMaskEditor } from "@/components/ImageMaskEditor";
 import { cn } from "@/lib/utils";
 
 export function EditorView() {
-    const { steps, filename, updateStep, reset } = useVideo();
+    const { steps, filename, updateStep, reset, isProcessing } = useVideo();
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
 
     // Video widget state
@@ -21,17 +22,18 @@ export function EditorView() {
     // Refs for scrolling to steps
     const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-    if (!steps) return null;
-
-    const getStep = (index: number) => steps[index];
+    const getStep = (index: number) => steps ? steps[index] : null;
 
     const handleDescriptionChange = (index: number, description: string) => {
         const step = getStep(index);
-        updateStep(index, { ...step, description });
+        if (step) {
+            updateStep(index, { ...step, description });
+        }
     };
 
     const handleMaskUpdate = (stepIndex: number, newMasks: any[]) => {
         const step = getStep(stepIndex);
+        if (!step) return;
 
         // Split combined masks back into highlight_box and mask_boxes
         const highlightMask = newMasks.find(m => m.type === 'highlight');
@@ -67,6 +69,7 @@ export function EditorView() {
     };
 
     const generateMarkdown = () => {
+        if (!steps) return '';
         let md = `# Video Manual: ${filename}\n\n`;
 
         steps.forEach((step: any, index: number) => {
@@ -118,6 +121,52 @@ export function EditorView() {
         });
         return md;
     };
+
+    if (!steps && isProcessing) {
+        return (
+            <div className="flex flex-col h-[calc(100vh-64px)]">
+                {/* Project Toolbar Skeleton */}
+                <div className="border-b bg-white sticky top-0 z-40 shadow-sm">
+                    <div className="container mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
+                        <Skeleton className="h-9 w-[200px]" />
+                        <Skeleton className="h-6 w-[300px]" />
+                        <div className="flex gap-2">
+                            <Skeleton className="h-9 w-20" />
+                            <Skeleton className="h-9 w-24" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Main Content Skeleton */}
+                <div className="flex flex-1 overflow-hidden bg-slate-50">
+                    <div className="w-full h-full relative overflow-y-auto px-4 py-8 sm:px-8">
+                        <div className="max-w-6xl mx-auto space-y-8 pb-32">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className="bg-white border rounded-lg overflow-hidden shadow-sm">
+                                    <div className="p-4 border-b flex items-center gap-3">
+                                        <Skeleton className="w-8 h-8 rounded-full" />
+                                        <div className="space-y-2">
+                                            <Skeleton className="h-4 w-[200px]" />
+                                            <Skeleton className="h-3 w-[100px]" />
+                                        </div>
+                                    </div>
+                                    <div className="p-6 border-b flex justify-center bg-slate-50">
+                                        <Skeleton className="w-full h-64 rounded-lg mix-w-[600px]" />
+                                    </div>
+                                    <div className="p-6 space-y-2">
+                                        <Skeleton className="h-4 w-24" />
+                                        <Skeleton className="w-full h-24 rounded-md" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    if (!steps) return null;
 
     return (
         <div className="flex flex-col h-[calc(100vh-64px)] print:h-auto print:block">
@@ -259,9 +308,13 @@ export function EditorView() {
                                                                 onUpdate={(newMasks) => handleMaskUpdate(index, newMasks)}
                                                             />
                                                         ) : (
-                                                            <div className="flex items-center justify-center h-64 text-muted-foreground bg-slate-100 rounded-lg">
-                                                                No Image
-                                                            </div>
+                                                            isProcessing ? (
+                                                                <Skeleton className="w-full h-64 rounded-lg" />
+                                                            ) : (
+                                                                <div className="flex items-center justify-center h-64 text-muted-foreground bg-slate-100 rounded-lg">
+                                                                    No Image
+                                                                </div>
+                                                            )
                                                         )}
                                                     </div>
                                                 </div>
@@ -273,7 +326,7 @@ export function EditorView() {
                                                         Description
                                                     </div>
                                                     <Textarea
-                                                        value={step.description}
+                                                        value={step.description || ''}
                                                         onChange={(e) => handleDescriptionChange(index, e.target.value)}
                                                         placeholder="Describe this step..."
                                                         className="min-h-[100px] resize-none text-base border-slate-200 focus-visible:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors"
