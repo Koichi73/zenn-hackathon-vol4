@@ -100,14 +100,8 @@ async def process_video_stream(file: UploadFile = File(...)):
 
                     # Notify 1 step image ready (send partial update)
                     print(f"Server: Image ready for Step {index+1}: {image_url}")
-                    image_update_data = {
-                        "type": "update",
-                        "index": index,
-                        "step": {
-                            "image_url": image_url
-                        }
-                    }
-                    yield f"data: {json.dumps(image_update_data)}\n\n"
+                    # Intermediate update skipped to show skeleton until full analysis
+
                     
                     # Resolve path for Gemini
                     full_image_path = gemini_service.resolve_image_path(image_url)
