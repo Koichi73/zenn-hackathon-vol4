@@ -201,6 +201,7 @@ class GeminiService:
                     response_mime_type="application/json",
                     response_schema=StepDetail,
                     temperature=self.temperature,
+                    thinking_config=types.ThinkingConfig(thinking_level="low"),
                 )
             )
             
