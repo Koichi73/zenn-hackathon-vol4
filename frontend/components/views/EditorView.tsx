@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { saveManualToGCS } from "@/api/manual-storage-api";
 
 export function EditorView() {
-    const { steps, filename, updateStep, reset, isProcessing, videoUrl } = useVideo();
+    const { steps, filename, updateStep, reset, isProcessing, videoUrl, videoFile } = useVideo();
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
     const [isSaving, setIsSaving] = useState(false);
 
@@ -21,8 +21,8 @@ export function EditorView() {
         if (!steps || !filename) return;
         setIsSaving(true);
         try {
-            await saveManualToGCS(filename, steps);
-            alert("手順書をGCSに保存しました！\nmanuals/ 配下にJSONとMarkdownが保存されました。");
+            await saveManualToGCS(filename, steps, videoFile);
+            alert("手順書をGCSに保存しました！\nmanuals/ 配下にJSONと動画・画像が保存されました。");
         } catch (error) {
             console.error("Save error:", error);
             alert("保存に失敗しました: " + (error instanceof Error ? error.message : "不明なエラー"));

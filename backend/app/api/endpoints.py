@@ -1,10 +1,10 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import StreamingResponse
 from app.services.gemini_service import GeminiService, ManualStep
 from app.services.video_service import VideoService
 from app.services.manual_save_service import ManualSaveService
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 import shutil
 import os
 import uuid
@@ -16,20 +16,37 @@ TEMP_DIR = "/tmp/video_uploads"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 
-class SaveManualRequest(BaseModel):
-    manual_id: str
-    steps: List[dict]
-
-
 @router.post("/save-manual")
-async def save_manual(request: SaveManualRequest):
+async def save_manual(
+    manual_id: str = Form(...),
+    steps: str = Form(...),
+    video: Optional[UploadFile] = File(None)
+):
     try:
+        steps_list = json.loads(steps)
         save_service = ManualSaveService()
-        # steps is a list of dicts, which ManualSaveService expects
-        result = await save_service.save_to_gcs(request.steps, request.manual_id)
+        
+        # 保存先の準備
+        video_path = None
+        if video:
+            video_id = str(uuid.uuid4())
+            video_path = f"{TEMP_DIR}/save_{video_id}_{video.filename}"
+            with open(video_path, "wb") as buffer:
+                shutil.copyfileobj(video.file, buffer)
+        
+        result = await save_service.save_to_gcs(
+            steps=steps_list, 
+            manual_id=manual_id,
+            video_path=video_path
+        )
+        
+        # Cleanup video if it was saved locally
+        if video_path and os.path.exists(video_path):
+            os.remove(video_path)
+            
         return {
             "status": "success",
-            "message": "Manual saved to GCS",
+            "message": "Manual and assets saved to GCS",
             "paths": result
         }
     except Exception as e:
