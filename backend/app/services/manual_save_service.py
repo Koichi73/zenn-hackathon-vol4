@@ -11,11 +11,13 @@ class ManualSaveService:
         self.formatter = ManualFormatService()
         self.app_dir = Path(__file__).resolve().parent.parent
 
-    async def save_to_gcs(self, steps: list[dict], manual_id: str):
+    async def save_to_gcs(self, steps: list[dict], manual_id: str, video_path: str = None):
         """
-        画像と手順書JSONをGCSに保存
+        各ステップの画像、元動画、および手順書JSONをGCSに保存
         """
         updated_steps = []
+        now_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        full_id = f"{manual_id}_{now_timestamp}"
 
         # 1. 各ステップの画像をアップロードしてURLを置換
         for step in steps:
@@ -24,14 +26,13 @@ class ManualSaveService:
 
             if image_url and image_url.startswith("/static/"):
                 # ローカルの絶対パスに変換
-                # 例: /static/frames/xxx.jpg -> backend/app/static/frames/xxx.jpg
                 relative_path = image_url.lstrip("/")
                 local_path = str(self.app_dir / relative_path)
 
                 if os.path.exists(local_path):
-                    # GCSの保存先: manuals/images/{manual_id}/{filename}
+                    # GCSの保存先
                     filename = os.path.basename(local_path)
-                    gcs_dest_path = f"manuals/images/{manual_id}/{filename}"
+                    gcs_dest_path = f"manuals/images/{full_id}/{filename}"
 
                     # アップロード実行
                     public_url = await asyncio.to_thread(
@@ -44,11 +45,23 @@ class ManualSaveService:
             
             updated_steps.append(new_step)
 
-        # 2. 更新されたステップ情報でJSONを作成
-        # 現在時刻の文字列をmanual_idに付与
-        now_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        # 2. GCSに動画をアップロード
+        gcs_video_path = f"manuals/videos/{full_id}.mp4"
+        if video_path and os.path.exists(video_path):
+            try:
+                await asyncio.to_thread(
+                    self.gcs_repository.upload_file,
+                    video_path,
+                    gcs_video_path
+                )
+            except Exception as gcs_err:
+                print(f"GCS Video Upload Error: {gcs_err}")
+                # ここでは例外をそのまま上げず、ログに記録して続行するか、特定の例外を投げる
+                raise gcs_err
+
+        # 3. 更新されたステップ情報でJSONを作成
         json_content = self.formatter.to_json(updated_steps)
-        json_path = f"manuals/json/{manual_id}_{now_timestamp}.json"
+        json_path = f"manuals/json/{full_id}.json"
 
         # JSONをアップロード
         await asyncio.to_thread(
@@ -60,5 +73,6 @@ class ManualSaveService:
 
         return {
             "json_path": json_path,
+            "video_path": gcs_video_path,
             "image_count": len([s for s in updated_steps if s.get("image_url", "").startswith("http")])
         }
