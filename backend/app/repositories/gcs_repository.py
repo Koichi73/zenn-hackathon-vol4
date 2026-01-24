@@ -43,13 +43,3 @@ class GCSRepository:
         blob = self.bucket.blob(destination_blob_name)
         blob.upload_from_string(content, content_type=content_type)
         return blob.public_url
-
-# 使用例
-# # GCSに動画をアップロード
-#     try:
-#         print("Uploading video to GCS...")
-#         gcs_utils = GCSUtils()
-#         gcs_utils.upload_file(file_path, f"videos/{file_id}_{file.filename}")
-#     except Exception as gcs_err:
-#         print(f"GCS Upload Error: {gcs_err}")
-#         raise HTTPException(status_code=500, detail="Failed to upload video to GCS")
