@@ -5,15 +5,31 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Download, Cast as MaskIcon, Play, Maximize2, Minimize2, X, ChevronRight, PenTool, Save, Share2 } from 'lucide-react';
+import { Download, Cast as MaskIcon, Play, Maximize2, Minimize2, X, ChevronRight, PenTool, Save, Share2, Loader2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { ManualPreview } from "@/components/ManualPreview";
 import { ImageMaskEditor } from "@/components/ImageMaskEditor";
 import { cn } from "@/lib/utils";
+import { saveManualToGCS } from "@/api/manual-storage-api";
 
 export function EditorView() {
     const { steps, filename, updateStep, reset, isProcessing, videoUrl } = useVideo();
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSave = async () => {
+        if (!steps || !filename) return;
+        setIsSaving(true);
+        try {
+            await saveManualToGCS(filename, steps);
+            alert("手順書をGCSに保存しました！\nmanuals/ 配下にJSONとMarkdownが保存されました。");
+        } catch (error) {
+            console.error("Save error:", error);
+            alert("保存に失敗しました: " + (error instanceof Error ? error.message : "不明なエラー"));
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     // Video widget state
     const [isVideoWidgetOpen, setIsVideoWidgetOpen] = useState(true);
@@ -246,9 +262,19 @@ export function EditorView() {
 
                     {/* Right: Action Buttons */}
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm">
-                            <Save className="w-4 h-4 mr-2" />
-                            Save
+                        <Button
+                            variant="default"
+                            size="sm"
+                            onClick={handleSave}
+                            disabled={isSaving || isProcessing}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                            {isSaving ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                                <Save className="w-4 h-4 mr-2" />
+                            )}
+                            {isSaving ? "Saving..." : "Save"}
                         </Button>
                         <Button variant="outline" size="sm">
                             <Share2 className="w-4 h-4 mr-2" />
