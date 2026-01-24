@@ -1,7 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
-from app.services.gemini_service import GeminiService
+from app.services.gemini_service import GeminiService, ManualStep
 from app.services.video_service import VideoService
+from app.services.manual_save_service import ManualSaveService
+from pydantic import BaseModel
+from typing import List
 import shutil
 import os
 import uuid
@@ -12,6 +15,26 @@ router = APIRouter()
 TEMP_DIR = "/tmp/video_uploads"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+
+class SaveManualRequest(BaseModel):
+    manual_id: str
+    steps: List[dict]
+
+
+@router.post("/save-manual")
+async def save_manual(request: SaveManualRequest):
+    try:
+        save_service = ManualSaveService()
+        # steps is a list of dicts, which ManualSaveService expects
+        result = await save_service.save_to_gcs(request.steps, request.manual_id)
+        return {
+            "status": "success",
+            "message": "Manual saved to GCS",
+            "paths": result
+        }
+    except Exception as e:
+        print(f"Save Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/process-video")
