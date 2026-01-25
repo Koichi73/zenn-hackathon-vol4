@@ -10,18 +10,23 @@ import { useVideo } from "@/components/providers/VideoProvider";
 import { ManualPreview } from "@/components/ManualPreview";
 import { ImageMaskEditor } from "@/components/ImageMaskEditor";
 import { cn } from "@/lib/utils";
-import { saveManualToGCS } from "@/api/manual-storage-api";
+import { saveManual } from "@/api/manual-api";
+import { ShareDialog } from "@/components/ShareDialog";
 
 export function EditorView() {
-    const { steps, filename, updateStep, reset, isProcessing, videoUrl, videoFile } = useVideo();
+    const { steps, filename, updateStep, reset, isProcessing, videoUrl, videoFile, manualId, setManualId } = useVideo();
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
     const [isSaving, setIsSaving] = useState(false);
+    const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
     const handleSave = async () => {
         if (!steps || !filename) return;
         setIsSaving(true);
         try {
-            await saveManualToGCS(filename, steps, videoFile);
+            const result = await saveManual(filename, steps, videoFile);
+            if (result.paths && result.paths.id) {
+                setManualId(result.paths.id);
+            }
             alert("手順書をGCSに保存しました！\nmanuals/ 配下にJSONと動画・画像が保存されました。");
         } catch (error) {
             console.error("Save error:", error);
@@ -30,6 +35,26 @@ export function EditorView() {
             setIsSaving(false);
         }
     };
+
+    const handleShareClick = () => {
+        if (!manualId) {
+            alert("共有機能を使う前に、まず保存してください。");
+            return;
+        }
+        setIsShareDialogOpen(true);
+    };
+
+    // ... (rest of the component)
+
+    // Video widget state and other logic remains same...
+    // Only showing changed parts to be safe with context limits, 
+    // but replace_file_content needs contiguous block. 
+    // I will use replace_file_content for specific blocks or I need to provide larger context.
+
+    // Since I'm using replace_file_content with line numbers, I'll split into chunks or use a large chunk if I'm replacing the whole init part.
+    // The previous view_file showed lines 1-495.
+
+    // Let's replace the top part first to add imports and state.
 
     // Video widget state
     const [isVideoWidgetOpen, setIsVideoWidgetOpen] = useState(true);
@@ -276,7 +301,7 @@ export function EditorView() {
                             )}
                             {isSaving ? "Saving..." : "Save"}
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={handleShareClick}>
                             <Share2 className="w-4 h-4 mr-2" />
                             Share
                         </Button>
@@ -489,6 +514,11 @@ export function EditorView() {
                     </div>
                 )}
             </div>
+            <ShareDialog
+                manualId={manualId || ""}
+                isOpen={isShareDialogOpen}
+                onOpenChange={setIsShareDialogOpen}
+            />
         </div>
     );
 }
