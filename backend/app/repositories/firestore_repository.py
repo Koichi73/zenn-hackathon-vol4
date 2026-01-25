@@ -10,7 +10,8 @@ class FirestoreRepository:
     # Firestoreクライアントの初期化
     def __init__(self):
         self.project_id = os.getenv("PROJECT_ID")
-        self.db = firestore.Client(project=self.project_id)
+        self.database_name = os.getenv("FIRESTORE_DATABASE")
+        self.db = firestore.Client(project=self.project_id, database=self.database_name)
 
     # ドキュメントの作成
     def create_document(self, collection_name: str, document_id: str, data: Dict[str, Any]) -> str:
@@ -59,24 +60,3 @@ class FirestoreRepository:
         doc_ref = self.db.collection(collection_name).document(document_id)
         doc_ref.delete()
 
-# 使用例
-# # Firestoreにデータを保存
-# try:
-#     firestore_repo = FirestoreRepository()
-#     
-#     # ドキュメント作成
-#     firestore_repo.create_document("videos", "video_001", {
-#         "title": "Sample Video",
-#         "url": "https://example.com/video.mp4",
-#         "created_at": firestore.SERVER_TIMESTAMP
-#     })
-#     
-#     # ドキュメント取得
-#     video_data = firestore_repo.get_document("videos", "video_001")
-#     print(video_data)
-#     
-#     # クエリ検索
-#     results = firestore_repo.query_documents("videos", "title", "==", "Sample Video")
-#     
-# except Exception as e:
-#     print(f"Firestore Error: {e}")

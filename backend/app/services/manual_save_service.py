@@ -2,12 +2,15 @@ import asyncio
 import os
 from pathlib import Path
 from app.repositories.gcs_repository import GCSRepository
+from app.repositories.firestore_repository import FirestoreRepository
 from app.services.manual_format_service import ManualFormatService
 from datetime import datetime
+from google.cloud import firestore
 
 class ManualSaveService:
     def __init__(self):
         self.gcs_repository = GCSRepository()
+        self.firestore_repository = FirestoreRepository()
         self.formatter = ManualFormatService()
         self.app_dir = Path(__file__).resolve().parent.parent
 
@@ -70,8 +73,47 @@ class ManualSaveService:
             "application/json"
         )
 
+        # 4. Firestore にメタデータを保存
+        metadata = {
+            "id": full_id,
+            "title": manual_id,
+            "manual_id": manual_id,
+            "gcs_json_path": json_path,
+            "gcs_video_path": gcs_video_path,
+            "step_count": len(updated_steps),
+            "status": "completed",
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "updated_at": firestore.SERVER_TIMESTAMP
+        }
+
+        try:
+            # ユーザーごとのサブコレクションに保存するためのパス
+            # ログイン機能実装後にuser_idを取得する
+            user_id = "test-user-001"
+            collection_path = f"users/{user_id}/manuals"
+            
+            await asyncio.to_thread(
+                self.firestore_repository.create_document,
+                collection_path,
+                full_id,
+                metadata
+            )
+        except Exception as e:
+            # エラー時はGCSのファイルを削除する
+            await asyncio.to_thread(
+                self.gcs_repository.delete_file,
+                json_path
+            )
+            await asyncio.to_thread(
+                self.gcs_repository.delete_file,
+                gcs_video_path
+            )
+            print(f"Firestore Error: {e}")
+            raise e
+
         return {
             "json_path": json_path,
             "video_path": gcs_video_path,
+            "firestore_id": full_id,
             "image_count": len([s for s in updated_steps if s.get("image_url", "").startswith("http")])
         }
