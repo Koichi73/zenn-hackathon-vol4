@@ -29,6 +29,10 @@ class ManualService:
         
         manual_data = docs[0]
         
+        # 公開設定チェック
+        if not manual_data.get("is_public", False):
+            return None
+
         # 2. GCSから詳細JSON（手順ステップ）を取得
         json_path = manual_data.get("gcs_json_path")
         if not json_path:
@@ -113,7 +117,7 @@ class ManualService:
             "gcs_video_path": gcs_video_path,
             "step_count": len(updated_steps),
             "status": "completed",
-            "is_public": True, # デフォルトで公開
+            "is_public": False, # 保存直後は非公開
             "created_at": firestore.SERVER_TIMESTAMP,
             "updated_at": firestore.SERVER_TIMESTAMP
         }

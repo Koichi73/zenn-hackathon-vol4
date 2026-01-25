@@ -34,6 +34,7 @@ class GCSRepository:
         blob = self.bucket.blob(blob_name)
         blob.delete()
 
+
     # 文字列やバイトデータを直接アップロード
     def upload_structure_content(self, content: str, destination_blob_name: str, content_type: str = "text/plain") -> str:
         """
@@ -43,3 +44,11 @@ class GCSRepository:
         blob = self.bucket.blob(destination_blob_name)
         blob.upload_from_string(content, content_type=content_type)
         return blob.public_url
+
+    # ファイルの中身を読み込む
+    def read_file(self, blob_name: str) -> str:
+        """
+        GCS上のファイルの中身を文字列として読み込む
+        """
+        blob = self.bucket.blob(blob_name)
+        return blob.download_as_text()
