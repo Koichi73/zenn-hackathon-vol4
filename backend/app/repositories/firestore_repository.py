@@ -52,6 +52,7 @@ class FirestoreRepository:
         doc_ref = self.db.collection(collection_name).document(document_id)
         doc_ref.update(data)
 
+
     # ドキュメントの削除
     def delete_document(self, collection_name: str, document_id: str) -> None:
         """
@@ -59,4 +60,12 @@ class FirestoreRepository:
         """
         doc_ref = self.db.collection(collection_name).document(document_id)
         doc_ref.delete()
+
+    # コレクショングループクエリ
+    def find_in_collection_group(self, collection_group_id: str, field: str, operator: str, value: Any) -> List[Dict[str, Any]]:
+        """
+        コレクショングループを使ってドキュメントを検索
+        """
+        docs = self.db.collection_group(collection_group_id).where(field, operator, value).stream()
+        return [{"id": doc.id, "path": doc.reference.path, **doc.to_dict()} for doc in docs]
 

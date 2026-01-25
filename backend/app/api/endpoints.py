@@ -183,4 +183,34 @@ async def process_video_stream(file: UploadFile = File(...)):
                 except Exception as cleanup_err:
                     print(f"Cleanup Error: {cleanup_err}")
 
+
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+# --- 手順書共有エンドポイント ---
+
+from app.services.manual_service import ManualService
+from pydantic import BaseModel
+
+class PublishRequest(BaseModel):
+    is_public: bool
+
+@router.get("/public/manuals/{manual_id}")
+async def get_public_manual(manual_id: str):
+    service = ManualService()
+    manual = service.get_public_manual(manual_id)
+    if not manual:
+        raise HTTPException(status_code=404, detail="Manual not found or not public")
+    return manual
+
+@router.put("/manuals/{manual_id}/publish")
+async def toggle_manual_publish(manual_id: str, request: PublishRequest):
+    # ログインユーザーのIDを取得する
+    user_id = "test-user-001"
+    
+    service = ManualService()
+    success = service.update_visibility(user_id, manual_id, request.is_public)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Manual not found")
+        
+    return {"status": "success", "is_public": request.is_public}
