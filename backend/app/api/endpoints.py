@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import StreamingResponse
 from app.services.gemini_service import GeminiService, ManualStep
 from app.services.video_service import VideoService
-from app.services.manual_save_service import ManualSaveService
+from app.services.manual_service import ManualService
 from pydantic import BaseModel
 from typing import List, Optional
 import shutil
@@ -24,7 +24,7 @@ async def save_manual(
 ):
     try:
         steps_list = json.loads(steps)
-        save_service = ManualSaveService()
+        service = ManualService()
         
         # 保存先の準備
         video_path = None
@@ -34,7 +34,7 @@ async def save_manual(
             with open(video_path, "wb") as buffer:
                 shutil.copyfileobj(video.file, buffer)
         
-        result = await save_service.save_to_gcs(
+        result = await service.save_manual(
             steps=steps_list, 
             manual_id=manual_id,
             video_path=video_path
@@ -188,7 +188,6 @@ async def process_video_stream(file: UploadFile = File(...)):
 
 # --- 手順書共有エンドポイント ---
 
-from app.services.manual_service import ManualService
 from pydantic import BaseModel
 
 class PublishRequest(BaseModel):
