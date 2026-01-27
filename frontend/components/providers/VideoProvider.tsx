@@ -30,6 +30,10 @@ interface VideoContextType {
   filename: string;
   isProcessing: boolean;
   error: string | null;
+  videoUrl: string | null;
+  videoFile: File | null;
+  manualId: string | null;
+  setManualId: (id: string | null) => void;
   processVideo: (file: File) => Promise<void>;
   updateStep: (index: number, updatedStep: Step) => void;
   reset: () => void;
@@ -42,12 +46,21 @@ export function VideoProvider({ children }: { children: ReactNode }) {
   const [filename, setFilename] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [manualId, setManualId] = useState<string | null>(null);
 
   const processVideo = async (file: File) => {
     setIsProcessing(true);
     setError(null);
     setSteps(null);
     setFilename(file.name);
+    setVideoFile(file);
+    setManualId(null);
+
+    // ローカルプレビューURL作成
+    const url = URL.createObjectURL(file);
+    setVideoUrl(url);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -103,8 +116,7 @@ export function VideoProvider({ children }: { children: ReactNode }) {
               setSteps((prevSteps) => {
                 if (!prevSteps) return prevSteps;
                 const newSteps = [...prevSteps];
-                // Merge existing step data with new details (e.g. keep timestamp/title if needed, or overwrite)
-                // The update sends the full detailed step
+                // Merge existing step data with new details
                 newSteps[data.index] = {
                   ...newSteps[data.index],
                   ...data.step
@@ -141,6 +153,12 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     setSteps(null);
     setFilename("");
     setError(null);
+    setVideoFile(null);
+    setManualId(null);
+    if (videoUrl) {
+      URL.revokeObjectURL(videoUrl);
+    }
+    setVideoUrl(null);
   };
 
   return (
@@ -150,6 +168,10 @@ export function VideoProvider({ children }: { children: ReactNode }) {
         filename,
         isProcessing,
         error,
+        videoUrl,
+        videoFile,
+        manualId,
+        setManualId,
         processVideo,
         updateStep,
         reset,

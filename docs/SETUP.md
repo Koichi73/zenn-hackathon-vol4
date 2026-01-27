@@ -82,7 +82,16 @@ cp .env.template .env
 PROJECT_ID=<YOUR_PROJECT_ID>
 LOCATION=global
 MODEL_NAME=gemini-1.5-flash-002
+BUCKET_NAME=<YOUR_BUCKET_ID>
+FIRESTORE_DATABASE=<YOUR_FIRESTORE_DATABASE>
 ```
+
+`.env.localファイルの内容を環境に合わせて修正してください。`
+
+```ini
+firebaseのconfigを記載
+```
+
 * `MODEL_NAME`: 利用したいGeminiのモデル名を指定してください（例: `gemini-1.5-flash-002` など）。
 
 ### 2.3 起動確認

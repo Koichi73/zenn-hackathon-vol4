@@ -4,6 +4,7 @@ import { Noto_Sans_JP } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { VideoProvider } from "@/components/providers/VideoProvider"
+import { AuthProvider } from "@/contexts/AuthContext"
 
 const notoSansJP = Noto_Sans_JP({
   subsets: ["latin"],
@@ -41,9 +42,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${notoSansJP.className} font-sans antialiased`}>
-        <VideoProvider>
-          {children}
-        </VideoProvider>
+        <AuthProvider>
+          <VideoProvider>
+            {children}
+          </VideoProvider>
+        </AuthProvider>
         <Analytics />
       </body>
     </html>
