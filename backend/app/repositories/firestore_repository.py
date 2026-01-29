@@ -11,7 +11,12 @@ class FirestoreRepository:
     def __init__(self):
         self.project_id = os.getenv("PROJECT_ID")
         self.database_name = os.getenv("FIRESTORE_DATABASE")
-        self.db = firestore.Client(project=self.project_id, database=self.database_name)
+        self.credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        self.db = firestore.Client.from_service_account_json(
+            self.credentials_path,
+            project=self.project_id,
+            database=self.database_name
+        )
 
     # ドキュメントの作成
     def create_document(self, collection_name: str, document_id: str, data: Dict[str, Any]) -> str:

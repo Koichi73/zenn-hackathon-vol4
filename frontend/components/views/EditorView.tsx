@@ -159,7 +159,8 @@ export function EditorView() {
             md += `${step.description}\n\n`;
 
             if (step.image_url) {
-                const fullImageUrl = `http://localhost:8000${step.image_url}`;
+                const isAbsolute = step.image_url.startsWith("http");
+                const fullImageUrl = isAbsolute ? step.image_url : `http://localhost:8000${step.image_url}`;
 
                 // Encode masks into the URL for the preview renderer
                 let imageUrlForMarkdown = fullImageUrl;
@@ -386,7 +387,7 @@ export function EditorView() {
                                                     <div className="w-full relative shadow-sm bg-white rounded-lg p-2">
                                                         {step.image_url ? (
                                                             <ImageMaskEditor
-                                                                imageUrl={`http://localhost:8000${step.image_url}`}
+                                                                imageUrl={step.image_url?.startsWith("http") ? step.image_url : `http://localhost:8000${step.image_url}`}
                                                                 initialMasks={[
                                                                     ...(step.highlight_box ? [{
                                                                         type: 'highlight',

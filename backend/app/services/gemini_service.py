@@ -74,28 +74,49 @@ class GeminiService:
         self.model_name = os.getenv("MODEL_NAME", "gemini-3-flash-preview")
         self.temperature = 1.0 if self.model_name == "gemini-3-flash-preview" else 0.0
 
-    async def generate_manual_from_video(self, video_path: str, video_service) -> List[ManualStep]:
+    async def generate_manual_from_video(self, video_path: str, video_service, manual_id: str, manual_service, gcs_video_uri: Optional[str] = None) -> List[ManualStep]:
         """
-        Main pipeline:
-            1. Analyze video structure (timestamps & titles)
-            2. Extract images using VideoService
-            3. Analyze images for details (masks, highlight, descriptions)
+        Main pipeline with Incremental Firestore Updates:
+            1. Analyze video structure -> Update Firestore (Phase 1)
+            2. Extract images
+            3. Analyze images -> Update Firestore per step (Phase 3)
         """
-        print(f"Starting analysis for: {video_path}")
+        print(f"Starting analysis for: {gcs_video_uri if gcs_video_uri else video_path}")
 
         # Phase 1: Video Structure
         print("Phase 1: Analyzing video structure...")
-        structures = await self.analyze_video_structure(video_path)
+        structures = await self.analyze_video_structure(gcs_video_uri if gcs_video_uri else video_path)
         if not structures:
             print("Phase 1 failed: No structure found.")
+            # エラー状態更新などが必要だが、一旦終了
+            manual_service.update_manual_status(manual_id, "error")
             return []
         
         print(f"Phase 1 complete. Found {len(structures)} steps.")
 
-        # Phase 2: Image Extraction
-        steps_for_extraction = [s.model_dump() for s in structures]
+        # [Firestore Update] 骨組み保存
+        # ManualStepの形に変換 (image_urlなどはNone)
+        current_steps = []
+        for s in structures:
+            current_steps.append({
+                "timestamp": s.timestamp,
+                "title": s.title,
+                "description": "", # Loading state handled by frontend
+                "highlight_box": None,
+                "mask_boxes": [],
+                "image_url": None
+            })
         
+        manual_service.init_manual_steps(manual_id, current_steps)
+
+        # Phase 2: Image Extraction
+        manual_service.update_manual_status(manual_id, "extracting_images")
+        
+        steps_for_extraction = [s.model_dump() for s in structures]
         print("Phase 2: Extracting images...")
+        
+        # 注意: GCSの動画パスを渡す必要があるが、video_serviceはローカルファイルを期待している。
+        # 現在のvideo_pathはローカルの一時ファイルパスのはずなのでOK。
         steps_with_images = await video_service.extract_frames(video_path, steps_for_extraction)
         
         # Verify images were extracted
@@ -103,28 +124,95 @@ class GeminiService:
         
         if not valid_steps:
              print("Phase 2 failed: No images extracted.")
+             manual_service.update_manual_status(manual_id, "error")
              return []
 
         print(f"Phase 2 complete. Extracted {len(valid_steps)} images.")
+        
+        # GCSへの画像アップロードが必要
+        # extract_frames は /static/... を返すが、これをGCSに上げてURL更新する必要がある。
+        # ManualService.save_manual のロジックの一部を再利用したいが、
+        # ここでは簡易的に「ここでアップロード」してしまう。
+        # または、今回はFrontendから直接GCS参照できない（Privateバケットなら）が、
+        # Publicバケット前提か、もしくは「詳細解析」のループ内で順次アップロード＆更新を行う。
+        
+        # GCS Repository for image upload
+        from app.repositories.gcs_repository import GCSRepository
+        gcs_repo = GCSRepository()
+        
+        # Phase 3: Image Analysis Loop & Incremental Update
+        manual_service.update_manual_status(manual_id, "analyzing_details")
+        print("Phase 3: Analyzing images sequentially for real-time updates...")
+        
+        final_steps = []
+        # current_steps (スケルトン) をベースに更新していく
+        
+        for i, step_data in enumerate(valid_steps):
+            image_url = step_data.get("image_url")
+            title = step_data.get("title")
+            timestamp = step_data.get("timestamp")
 
-        # Phase 3: Image Analysis
-        print("Phase 3: Analyzing images in parallel...")
-        final_steps = await self._analyze_images_parallel(valid_steps)
+            # 1. 画像アップロード (Local -> GCS)
+            # ローカルパス解決
+            local_file_path = self.resolve_image_path(image_url)
+            public_image_url = image_url 
+            
+            try:
+                if os.path.exists(local_file_path):
+                    filename = os.path.basename(local_file_path)
+                    # manuals/{id}/images/step_X.jpg
+                    gcs_dest_path = f"manuals/{manual_id}/images/{filename}"
+                    
+                    public_image_url = await asyncio.to_thread(
+                        gcs_repo.upload_file,
+                        local_file_path,
+                        gcs_dest_path
+                    )
+                    print(f"Uploaded image to: {public_image_url}")
+            except Exception as e:
+                print(f"Image upload failed for step {i}: {e}")
+
+            # 2. 詳細解析
+            analyzed_step = await self.analyze_single_image(local_file_path, title, timestamp, public_image_url)
+            
+            if analyzed_step:
+                # 3. リスト更新
+                step_dict = analyzed_step.model_dump()
+                
+                # uploadによりURLが変わったので反映
+                step_dict["image_url"] = public_image_url
+                
+                # 既存のリストを置換
+                if i < len(current_steps):
+                    current_steps[i] = step_dict
+                else:
+                    current_steps.append(step_dict)
+                
+                # [Firestore Update] 1ステップごとに更新
+                manual_service.update_manual_steps(manual_id, current_steps)
         
         print("Phase 3 complete.")
-        return final_steps
+        manual_service.complete_manual_job(manual_id, current_steps)
+        return [ManualStep(**s) for s in current_steps]
 
     async def analyze_video_structure(self, video_path: str) -> List[StepStructure]:
         """
         Phase 1: Video to Structure (Timestamps & Titles)
+        Supports local file path or GCS URI (gs://...)
         """
-        with open(video_path, "rb") as f:
-            video_data = f.read()
-            
-        video_part = types.Part.from_bytes(
-            data=video_data,
-            mime_type="video/mp4"
-        )
+        if video_path.startswith("gs://"):
+             video_part = types.Part.from_uri(
+                uri=video_path,
+                mime_type="video/mp4"
+            )
+        else:
+            with open(video_path, "rb") as f:
+                video_data = f.read()
+                
+            video_part = types.Part.from_bytes(
+                data=video_data,
+                mime_type="video/mp4"
+            )
 
         prompt = VIDEO_ANALYSIS_PROMPT
         

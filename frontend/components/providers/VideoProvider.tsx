@@ -1,6 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { ref, uploadBytes } from "firebase/storage";
+import { db, storage } from "@/lib/firebase";
 
 interface Step {
   title: string;
@@ -50,94 +53,107 @@ export function VideoProvider({ children }: { children: ReactNode }) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [manualId, setManualId] = useState<string | null>(null);
 
+  // Firestore Listener for Real-time Updates
+  React.useEffect(() => {
+    if (!manualId) return;
+
+    console.log("Setting up Firestore listener for:", manualId);
+    const user_id = "test-user-001"; // Fixed for now
+    const docRef = doc(db, "users", user_id, "manuals", manualId);
+
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        console.log("Firestore Update:", data.status);
+
+        // Update Steps
+        if (data.steps && Array.isArray(data.steps)) {
+          setSteps(data.steps as Step[]);
+        }
+
+        // Handle Processing State
+        if (data.status === "completed") {
+          setIsProcessing(false);
+        } else if (data.status === "error") {
+          setError("Analysis failed. Please try again.");
+          setIsProcessing(false);
+        } else {
+          // analyzing_structure, extracting_images, analyzing_details
+          setIsProcessing(true);
+        }
+
+      } else {
+        console.log("No such document!");
+      }
+    }, (err) => {
+      console.error("Firestore Error:", err);
+      setError("Failed to sync with server.");
+    });
+
+    return () => unsubscribe();
+  }, [manualId]);
+
   const processVideo = async (file: File) => {
     setIsProcessing(true);
     setError(null);
     setSteps(null);
     setFilename(file.name);
     setVideoFile(file);
+    // manualId set to null to clear previous listener
     setManualId(null);
 
-    // ローカルプレビューURL作成
+    // Local preview
     const url = URL.createObjectURL(file);
     setVideoUrl(url);
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
-      // Use process-video-stream for SSE
-      const response = await fetch("http://localhost:8000/api/process-video-stream", {
+      // 1. Generate ID
+      const newManualId = crypto.randomUUID();
+
+      // 2. Upload to Firebase Storage
+      // Fixed path structure requested by user: manuals/{manual_id}/video.mp4
+      const storagePath = `manuals/${newManualId}/video.mp4`;
+      const storageRef = ref(storage, storagePath);
+
+      console.log("Uploading to:", storagePath);
+      await uploadBytes(storageRef, file);
+
+      // 3. Construct GS URL
+      const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+      const gsUrl = `gs://${bucketName}/${storagePath}`;
+      console.log("Uploaded. GS URL:", gsUrl);
+
+      // 4. Call Backend
+      const title = file.name.replace(/\.[^/.]+$/, "");
+
+      const response = await fetch("http://localhost:8000/api/analyze", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          manual_id: newManualId,
+          video_url: gsUrl,
+          title: title
+        }),
       });
 
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
       }
 
-      if (!response.body) {
-        throw new Error("ReadableStream not supported in this browser.");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      // Loop to read stream
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) break;
-
-        // Decode chunk and add to buffer
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
-
-        // Process lines in buffer
-        const lines = buffer.split("\n\n"); // SSE events are separated by double newline
-        // Keep the last partial line in buffer
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (!trimmedLine.startsWith("data: ")) continue;
-
-          const jsonStr = trimmedLine.replace("data: ", "");
-          try {
-            const data = JSON.parse(jsonStr);
-            console.log("SSE Event:", data);
-
-            if (data.type === "init") {
-              // Initialize steps structure
-              setSteps(data.steps);
-            } else if (data.type === "update") {
-              // Update specific step
-              setSteps((prevSteps) => {
-                if (!prevSteps) return prevSteps;
-                const newSteps = [...prevSteps];
-                // Merge existing step data with new details
-                newSteps[data.index] = {
-                  ...newSteps[data.index],
-                  ...data.step
-                };
-                return newSteps;
-              });
-            } else if (data.type === "complete") {
-              console.log("Processing complete");
-            } else if (data.type === "error") {
-              setError(data.message || "Unknown error during streaming");
-            }
-          } catch (e) {
-            console.error("Error parsing SSE JSON:", e);
-          }
-        }
+      const data = await response.json();
+      if (data.status === "accepted" && data.manual_id) {
+        console.log("Analysis started, Job ID:", data.manual_id);
+        setManualId(data.manual_id);
+        // Listener will pick up from here
+      } else {
+        throw new Error("Invalid server response");
       }
 
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Failed to upload video");
-    } finally {
       setIsProcessing(false);
     }
   };
