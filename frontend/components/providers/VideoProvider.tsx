@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
-import { ref, uploadBytes } from "firebase/storage";
+import { ref, uploadBytes, uploadBytesResumable } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 
 interface Step {
@@ -32,6 +32,9 @@ interface VideoContextType {
   steps: Step[] | null;
   filename: string;
   isProcessing: boolean;
+  processingStage: 'idle' | 'uploading' | 'analyzing' | 'completed';
+  uploadProgress: number;
+  status: string; // "analyzing_structure", "extracting_images", "analyzing_details", "completed", "error"
   error: string | null;
   videoUrl: string | null;
   videoFile: File | null;
@@ -48,6 +51,9 @@ export function VideoProvider({ children }: { children: ReactNode }) {
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [filename, setFilename] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStage, setProcessingStage] = useState<'idle' | 'uploading' | 'analyzing' | 'completed'>('idle');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -65,6 +71,7 @@ export function VideoProvider({ children }: { children: ReactNode }) {
       if (docSnap.exists()) {
         const data = docSnap.data();
         console.log("Firestore Update:", data.status);
+        setStatus(data.status); // Expose status
 
         // Update Steps
         if (data.steps && Array.isArray(data.steps)) {
@@ -74,12 +81,15 @@ export function VideoProvider({ children }: { children: ReactNode }) {
         // Handle Processing State
         if (data.status === "completed") {
           setIsProcessing(false);
+          setProcessingStage('completed');
         } else if (data.status === "error") {
           setError("Analysis failed. Please try again.");
           setIsProcessing(false);
+          setProcessingStage('idle');
         } else {
           // analyzing_structure, extracting_images, analyzing_details
           setIsProcessing(true);
+          setProcessingStage('analyzing');
         }
 
       } else {
@@ -116,12 +126,32 @@ export function VideoProvider({ children }: { children: ReactNode }) {
       const storageRef = ref(storage, storagePath);
 
       console.log("Uploading to:", storagePath);
-      await uploadBytes(storageRef, file);
+      setProcessingStage('uploading');
+
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      await new Promise<void>((resolve, reject) => {
+        uploadTask.on('state_changed',
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            console.log('Upload is ' + progress + '% done');
+            setUploadProgress(progress);
+          },
+          (error) => {
+            reject(error);
+          },
+          () => {
+            resolve();
+          }
+        );
+      });
 
       // 3. Construct GS URL
       const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
       const gsUrl = `gs://${bucketName}/${storagePath}`;
       console.log("Uploaded. GS URL:", gsUrl);
+
+      setProcessingStage('analyzing'); // Upload done, API call next
 
       // 4. Call Backend
       const title = file.name.replace(/\.[^/.]+$/, "");
@@ -169,6 +199,9 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     setSteps(null);
     setFilename("");
     setError(null);
+    setProcessingStage('idle');
+    setUploadProgress(0);
+    setStatus("");
     setVideoFile(null);
     setManualId(null);
     if (videoUrl) {
@@ -183,6 +216,9 @@ export function VideoProvider({ children }: { children: ReactNode }) {
         steps,
         filename,
         isProcessing,
+        processingStage,
+        uploadProgress,
+        status,
         error,
         videoUrl,
         videoFile,

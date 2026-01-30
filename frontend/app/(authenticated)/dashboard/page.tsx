@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Upload, Video, Loader2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import {
     Dialog,
     DialogContent,
@@ -15,18 +16,19 @@ import {
 
 export default function DashboardPage() {
     const router = useRouter();
-    const { processVideo, isProcessing, steps, error } = useVideo();
+    const { processVideo, isProcessing, steps, error, processingStage, uploadProgress, status } = useVideo();
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
 
-    // Redirect to editor when steps are available (and we are in upload flow)
+    // Redirect to editor when frame extraction is complete (or manual is done/loaded)
     useEffect(() => {
-        if (steps && isUploadOpen) {
+        // "analyzing_details" means frame extraction (Phase 2) is done and we are analyzing individual images
+        if (isUploadOpen && (status === "analyzing_details" || status === "completed")) {
             setIsUploadOpen(false);
             // Use a specific ID or just 'new' for now since we don't have persistence
             router.push("/editor/new");
         }
-    }, [steps, isUploadOpen, router]);
+    }, [status, isUploadOpen, router]);
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -105,8 +107,19 @@ export default function DashboardPage() {
                                     disabled={isProcessing}
                                 />
 
-                                <div className="flex flex-col items-center gap-4 px-6 py-8">
-                                    {isProcessing ? (
+                                <div className="flex flex-col items-center gap-4 px-6 py-8 w-full max-w-sm mx-auto">
+                                    {processingStage === 'uploading' ? (
+                                        <div className="w-full space-y-4">
+                                            <div className="flex items-center justify-between text-sm text-foreground">
+                                                <span>Uploading video...</span>
+                                                <span>{Math.round(uploadProgress)}%</span>
+                                            </div>
+                                            <Progress value={uploadProgress} className="h-2" />
+                                            <p className="text-xs text-muted-foreground text-center">
+                                                Please wait while we upload your recording
+                                            </p>
+                                        </div>
+                                    ) : processingStage === 'analyzing' ? (
                                         <>
                                             <Loader2 className="w-12 h-12 text-primary animate-spin" />
                                             <div className="text-center space-y-2">
@@ -114,7 +127,7 @@ export default function DashboardPage() {
                                                     Analyzing video...
                                                 </h3>
                                                 <p className="text-sm text-muted-foreground">
-                                                    Generating manual...
+                                                    Extracting frames and structure...
                                                 </p>
                                             </div>
                                         </>

@@ -3,9 +3,10 @@
 import React, { useState } from "react";
 import { Upload, Video, Loader2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
+import { Progress } from "@/components/ui/progress";
 
 export function UploadView() {
-    const { processVideo, isProcessing, error } = useVideo();
+    const { processVideo, isProcessing, error, processingStage, uploadProgress } = useVideo();
     const [isDragging, setIsDragging] = useState(false);
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -72,8 +73,21 @@ export function UploadView() {
                         disabled={isProcessing}
                     />
 
-                    <div className="flex flex-col items-center gap-6 px-6 py-12">
-                        {isProcessing ? (
+                    <div className="flex flex-col items-center gap-6 px-6 py-12 w-full max-w-md mx-auto">
+                        {processingStage === 'uploading' ? (
+                            <div className="w-full space-y-6">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-sm text-foreground">
+                                        <span className="font-medium">Uploading video...</span>
+                                        <span className="font-medium">{Math.round(uploadProgress)}%</span>
+                                    </div>
+                                    <Progress value={uploadProgress} className="h-2" />
+                                </div>
+                                <p className="text-sm text-muted-foreground text-center">
+                                    Please wait while we upload your recording to our secure servers.
+                                </p>
+                            </div>
+                        ) : processingStage === 'analyzing' ? (
                             <>
                                 <Loader2 className="w-16 h-16 text-primary animate-spin" />
                                 <div className="text-center space-y-2">
