@@ -190,6 +190,14 @@ class GeminiService:
                 
                 # [Firestore Update] 1ステップごとに更新
                 manual_service.update_manual_steps(manual_id, current_steps)
+
+            # 4. Cleanup local image
+            if local_file_path and os.path.exists(local_file_path):
+                try:
+                    os.remove(local_file_path)
+                    print(f"Deleted local image: {local_file_path}")
+                except Exception as del_err:
+                    print(f"Failed to delete local image {local_file_path}: {del_err}")
         
         print("Phase 3 complete.")
         manual_service.complete_manual_job(manual_id, current_steps)

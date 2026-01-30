@@ -5,7 +5,7 @@ import { useVideo } from "@/components/providers/VideoProvider";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export default function EditorPage() {
+export default function EditorPage({ params }: { params: { id: string } }) {
     const { steps } = useVideo();
     const router = useRouter();
 

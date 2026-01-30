@@ -16,19 +16,18 @@ import {
 
 export default function DashboardPage() {
     const router = useRouter();
-    const { processVideo, isProcessing, steps, error, processingStage, uploadProgress, status } = useVideo();
+    const { processVideo, isProcessing, steps, error, processingStage, uploadProgress, status, manualId } = useVideo();
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
 
     // Redirect to editor when frame extraction is complete (or manual is done/loaded)
     useEffect(() => {
         // "analyzing_details" means frame extraction (Phase 2) is done and we are analyzing individual images
-        if (isUploadOpen && (status === "analyzing_details" || status === "completed")) {
+        if (isUploadOpen && (status === "analyzing_details" || status === "completed") && manualId) {
             setIsUploadOpen(false);
-            // Use a specific ID or just 'new' for now since we don't have persistence
-            router.push("/editor/new");
+            router.push(`/editor/${manualId}`);
         }
-    }, [status, isUploadOpen, router]);
+    }, [status, isUploadOpen, router, manualId]);
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
