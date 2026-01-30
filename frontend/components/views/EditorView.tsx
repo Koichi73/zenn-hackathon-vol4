@@ -7,11 +7,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Cast as MaskIcon, Play, Maximize2, Minimize2, X, ChevronRight, PenTool, Save, Share2, Loader2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
-import { ManualPreview } from "@/components/ManualPreview";
-import { ImageMaskEditor } from "@/components/ImageMaskEditor";
+import { ManualPreview } from "@/components/features/manual/ManualPreview";
+import { ImageMaskEditor } from "@/components/features/editor/ImageMaskEditor";
 import { cn } from "@/lib/utils";
 import { saveManual } from "@/api/manual-api";
-import { ShareDialog } from "@/components/ShareDialog";
+import { ShareDialog } from "@/components/features/share/ShareDialog";
 
 export function EditorView() {
     const { steps, filename, updateStep, reset, isProcessing, videoUrl, videoFile, manualId, setManualId } = useVideo();

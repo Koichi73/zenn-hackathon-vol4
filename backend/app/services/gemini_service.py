@@ -202,7 +202,7 @@ class GeminiService:
         """
         if video_path.startswith("gs://"):
              video_part = types.Part.from_uri(
-                uri=video_path,
+                file_uri=video_path,
                 mime_type="video/mp4"
             )
         else:
