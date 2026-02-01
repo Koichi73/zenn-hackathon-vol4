@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.api.endpoints import router as api_router
+from app.api.api import api_router
 import os
 
 app = FastAPI(title="Video to Manual Generator")

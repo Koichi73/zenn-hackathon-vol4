@@ -7,11 +7,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Cast as MaskIcon, Play, Maximize2, Minimize2, X, ChevronRight, PenTool, Save, Share2, Loader2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
-import { ManualPreview } from "@/components/ManualPreview";
-import { ImageMaskEditor } from "@/components/ImageMaskEditor";
+import { ManualPreview } from "@/components/features/manual/ManualPreview";
+import { ImageMaskEditor } from "@/components/features/editor/ImageMaskEditor";
 import { cn } from "@/lib/utils";
 import { saveManual } from "@/api/manual-api";
-import { ShareDialog } from "@/components/ShareDialog";
+import { ShareDialog } from "@/components/features/share/ShareDialog";
 
 export function EditorView() {
     const { steps, filename, updateStep, reset, isProcessing, videoUrl, videoFile, manualId, setManualId } = useVideo();
@@ -159,7 +159,8 @@ export function EditorView() {
             md += `${step.description}\n\n`;
 
             if (step.image_url) {
-                const fullImageUrl = `http://localhost:8000${step.image_url}`;
+                const isAbsolute = step.image_url.startsWith("http");
+                const fullImageUrl = isAbsolute ? step.image_url : `http://localhost:8000${step.image_url}`;
 
                 // Encode masks into the URL for the preview renderer
                 let imageUrlForMarkdown = fullImageUrl;
@@ -386,7 +387,7 @@ export function EditorView() {
                                                     <div className="w-full relative shadow-sm bg-white rounded-lg p-2">
                                                         {step.image_url ? (
                                                             <ImageMaskEditor
-                                                                imageUrl={`http://localhost:8000${step.image_url}`}
+                                                                imageUrl={step.image_url?.startsWith("http") ? step.image_url : `http://localhost:8000${step.image_url}`}
                                                                 initialMasks={[
                                                                     ...(step.highlight_box ? [{
                                                                         type: 'highlight',

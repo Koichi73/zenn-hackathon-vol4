@@ -148,6 +148,107 @@ class ManualService:
             "image_count": len([s for s in updated_steps if "http" in s.get("image_url", "")])
         }
 
+    # --- 新しい分析フロー（Firestore段階更新）用 ---
+
+    def create_manual_job(self, manual_id: str, title: str, video_path: str = None) -> str:
+        """
+        解析ジョブの初期レコードを作成
+        """
+        # 1. メタデータ初期化
+        now = firestore.SERVER_TIMESTAMP
+        metadata = {
+            "id": manual_id,
+            "manual_id": manual_id,
+            "title": title, # 仮タイトル
+            "status": "analyzing_structure", # ステータス: 構造解析中
+            "steps": [], # 空配列
+            "video_path": video_path, # GCSパス
+            "is_public": False,
+            "created_at": now,
+            "updated_at": now
+        }
+        
+        # 2. Firestore作成
+        # ログインユーザーのID (現状は固定/あとで引数にする)
+        user_id = "test-user-001"
+        collection_path = f"users/{user_id}/manuals"
+        
+        self.firestore_repository.create_document(
+            collection_path,
+            manual_id,
+            metadata
+        )
+        return manual_id
+
+    def update_manual_status(self, manual_id: str, status: str):
+        """ステータスのみ更新"""
+        user_id = "test-user-001"
+        collection_path = f"users/{user_id}/manuals"
+        self.firestore_repository.update_document(collection_path, manual_id, {
+            "status": status,
+            "updated_at": firestore.SERVER_TIMESTAMP
+        })
+
+    def init_manual_steps(self, manual_id: str, steps_structure: List[Dict]):
+        """
+        Phase 1完了時: ステップの骨組み（タイトル・タイムスタンプ）を保存
+        """
+        user_id = "test-user-001"
+        collection_path = f"users/{user_id}/manuals"
+        
+        # 配列をそのまま保存
+        self.firestore_repository.update_document(collection_path, manual_id, {
+            "steps": steps_structure,
+            "step_count": len(steps_structure),
+            "status": "extracting_images", # 次のステータスへ
+            "updated_at": firestore.SERVER_TIMESTAMP
+        })
+
+    def update_step_detail(self, manual_id: str, step_index: int, step_data: Dict):
+        """
+        Phase 3進行中: 特定のステップの詳細（画像・説明）を更新
+        Firestoreは配列の特定インデックス更新が苦手なので、
+        一度読み込んで更新するロック処理が必要だが、
+        今回は簡易的に Transaction なしで実装する（競合頻度が低いため）。
+        または、配列全体を持ち回る設計にする。
+        
+        ここでは、「GeminiService」が全ステップ配列を持っているので、
+        それを丸ごと更新する形が一番安全で簡単。
+        
+        しかし、頻繁な書き込みになるため、最適化検討。
+        一旦、Client側で「配列全体置換」を受け入れる設計にする。
+        """
+        pass # 下記 update_all_steps を使う
+
+    def update_manual_steps(self, manual_id: str, all_steps: List[Dict], status: str = None):
+        """
+        ステップ配列全体を更新する（進捗反映用）
+        """
+        user_id = "test-user-001"
+        collection_path = f"users/{user_id}/manuals"
+        
+        data = {
+            "steps": all_steps,
+            "updated_at": firestore.SERVER_TIMESTAMP
+        }
+        if status:
+            data["status"] = status
+
+        self.firestore_repository.update_document(collection_path, manual_id, data)
+
+    def complete_manual_job(self, manual_id: str, final_steps: List[Dict]):
+        """
+        全工程完了
+        """
+        user_id = "test-user-001"
+        collection_path = f"users/{user_id}/manuals"
+        
+        self.firestore_repository.update_document(collection_path, manual_id, {
+            "steps": final_steps,
+            "status": "completed",
+            "updated_at": firestore.SERVER_TIMESTAMP
+        })
+
     def update_visibility(self, user_id: str, manual_id: str, is_public: bool) -> bool:
         """
         公開状態を更新

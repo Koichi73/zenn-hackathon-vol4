@@ -1,6 +1,6 @@
 "use client";
 
-import { GlobalHeader } from "@/components/GlobalHeader";
+import { GlobalHeader } from "@/components/layout/GlobalHeader";
 
 export default function AuthenticatedLayout({
     children,

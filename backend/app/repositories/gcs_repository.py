@@ -20,6 +20,10 @@ class GCSRepository:
         """
         blob = self.bucket.blob(destination_blob_name)
         blob.upload_from_filename(source_file_path)
+        try:
+            blob.make_public()
+        except Exception as e:
+            print(f"Warning: Failed to make blob public: {e}")
         return blob.public_url
 
     # 動画、画像などファイルのダウンロード
@@ -43,6 +47,10 @@ class GCSRepository:
         """
         blob = self.bucket.blob(destination_blob_name)
         blob.upload_from_string(content, content_type=content_type)
+        try:
+            blob.make_public()
+        except Exception:
+            pass # Ignore if bucket policy prevents ACLs
         return blob.public_url
 
     # ファイルの中身を読み込む
