@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { ref, uploadBytes, uploadBytesResumable } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, auth } from "@/lib/firebase";
+import { onAuthStateChanged, User } from "firebase/auth";
 
 interface Step {
   title: string;
@@ -29,6 +30,8 @@ interface Step {
 }
 
 interface VideoContextType {
+  title: string;
+  setTitle: (title: string) => void;
   steps: Step[] | null;
   filename: string;
   isProcessing: boolean;
@@ -49,6 +52,7 @@ const VideoContext = createContext<VideoContextType | undefined>(undefined);
 
 export function VideoProvider({ children }: { children: ReactNode }) {
   const [steps, setSteps] = useState<Step[] | null>(null);
+  const [title, setTitle] = useState("");
   const [filename, setFilename] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStage, setProcessingStage] = useState<'idle' | 'uploading' | 'analyzing' | 'completed'>('idle');
@@ -58,13 +62,22 @@ export function VideoProvider({ children }: { children: ReactNode }) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [manualId, setManualId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Monitor Auth State
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Firestore Listener for Real-time Updates
   React.useEffect(() => {
-    if (!manualId) return;
+    if (!manualId || !currentUser) return;
 
     console.log("Setting up Firestore listener for:", manualId);
-    const user_id = "test-user-001"; // Fixed for now
+    const user_id = currentUser.uid;
     const docRef = doc(db, "users", user_id, "manuals", manualId);
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
@@ -72,6 +85,10 @@ export function VideoProvider({ children }: { children: ReactNode }) {
         const data = docSnap.data();
         console.log("Firestore Update:", data.status);
         setStatus(data.status); // Expose status
+
+        if (data.title) {
+          setTitle(data.title);
+        }
 
         // Update Steps
         if (data.steps && Array.isArray(data.steps)) {
@@ -101,7 +118,7 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [manualId]);
+  }, [manualId, currentUser]);
 
   const processVideo = async (file: File) => {
     setIsProcessing(true);
@@ -155,11 +172,15 @@ export function VideoProvider({ children }: { children: ReactNode }) {
 
       // 4. Call Backend
       const title = file.name.replace(/\.[^/.]+$/, "");
+      setTitle(title);
+
+      const token = await auth.currentUser?.getIdToken();
 
       const response = await fetch("http://localhost:8000/api/analyze", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           manual_id: newManualId,
@@ -197,8 +218,10 @@ export function VideoProvider({ children }: { children: ReactNode }) {
 
   const reset = () => {
     setSteps(null);
+    setTitle("");
     setFilename("");
     setError(null);
+    setIsProcessing(false);
     setProcessingStage('idle');
     setUploadProgress(0);
     setStatus("");
@@ -213,6 +236,8 @@ export function VideoProvider({ children }: { children: ReactNode }) {
   return (
     <VideoContext.Provider
       value={{
+        title,
+        setTitle,
         steps,
         filename,
         isProcessing,

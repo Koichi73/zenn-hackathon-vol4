@@ -9,39 +9,48 @@ import { Download, Cast as MaskIcon, Play, Maximize2, Minimize2, X, ChevronRight
 import { useVideo } from "@/components/providers/VideoProvider";
 import { ManualPreview } from "@/components/features/manual/ManualPreview";
 import { ImageMaskEditor } from "@/components/features/editor/ImageMaskEditor";
+import { Input } from '@/components/ui/input';
 import { cn } from "@/lib/utils";
-import { saveManual } from "@/api/manual-api";
+import { saveManual, updateManualTitle } from "@/api/manual-api";
 import { ShareDialog } from "@/components/features/share/ShareDialog";
 
 export function EditorView() {
-    const { steps, filename, updateStep, reset, isProcessing, videoUrl, videoFile, manualId, setManualId } = useVideo();
+    const { steps, filename, title, setTitle, updateStep, reset, isProcessing, videoUrl, videoFile, manualId, setManualId } = useVideo();
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
     const [isSaving, setIsSaving] = useState(false);
     const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
-    const handleSave = async () => {
-        if (!steps || !filename) return;
+    const handleShareClick = async () => {
+        console.log("=== Share Button Clicked ===");
+        console.log("manualId:", manualId);
+        console.log("steps:", steps?.length);
+        console.log("filename:", filename);
+        console.log("isSaving:", isSaving);
+
+        if (!manualId) {
+            console.error("No manualId available");
+            alert("共有機能を使う前に、まず保存してください。");
+            return;
+        }
+
+        if (!steps || !filename) {
+            console.error("No steps or filename");
+            alert("手順書のデータが不足しています。");
+            return;
+        }
+
         setIsSaving(true);
         try {
-            const result = await saveManual(filename, steps, videoFile);
-            if (result.paths && result.paths.id) {
-                setManualId(result.paths.id);
-            }
-            alert("手順書をGCSに保存しました！\nmanuals/ 配下にJSONと動画・画像が保存されました。");
+            console.log("Saving manual before sharing...");
+            await saveManual(manualId, title || filename, steps, videoFile);
+            console.log("Manual saved successfully, opening share dialog");
+            setIsShareDialogOpen(true);
         } catch (error) {
             console.error("Save error:", error);
             alert("保存に失敗しました: " + (error instanceof Error ? error.message : "不明なエラー"));
         } finally {
             setIsSaving(false);
         }
-    };
-
-    const handleShareClick = () => {
-        if (!manualId) {
-            alert("共有機能を使う前に、まず保存してください。");
-            return;
-        }
-        setIsShareDialogOpen(true);
     };
 
     // ... (rest of the component)
@@ -256,54 +265,70 @@ export function EditorView() {
             <div className="border-b bg-white sticky top-0 z-40 print:hidden shadow-sm">
                 <div className="container mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
                     {/* Left: Edit/Preview Segmented Control */}
-                    <div className="inline-flex items-center rounded-lg border bg-muted p-1">
-                        <button
-                            onClick={() => setViewMode('edit')}
-                            className={cn(
-                                "px-6 py-1.5 text-sm font-medium rounded-md transition-colors",
-                                viewMode === 'edit'
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            Edit
-                        </button>
-                        <button
-                            onClick={() => setViewMode('preview')}
-                            className={cn(
-                                "px-6 py-1.5 text-sm font-medium rounded-md transition-colors",
-                                viewMode === 'preview'
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            Preview
-                        </button>
+                    <div className="flex-1 flex justify-start">
+                        <div className="inline-flex items-center rounded-lg border bg-muted p-1">
+                            <button
+                                onClick={() => setViewMode('edit')}
+                                className={cn(
+                                    "px-6 py-1.5 text-sm font-medium rounded-md transition-colors",
+                                    viewMode === 'edit'
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onClick={() => setViewMode('preview')}
+                                className={cn(
+                                    "px-6 py-1.5 text-sm font-medium rounded-md transition-colors",
+                                    viewMode === 'preview'
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                Preview
+                            </button>
+                        </div>
                     </div>
 
                     {/* Center: Project Title */}
-                    <h1 className="text-lg font-bold absolute left-1/2 -translate-x-1/2 truncate max-w-[300px]">
-                        {filename}
-                    </h1>
+                    <div className="w-[300px] flex justify-center px-4 pointer-events-none">
+                        <Input
+                            value={title || ''}
+                            onChange={(e) => setTitle(e.target.value)}
+                            onBlur={async () => {
+                                if (manualId && title) {
+                                    try {
+                                        await updateManualTitle(manualId, title);
+                                        console.log("Title updated");
+                                    } catch (e) {
+                                        console.error("Failed to update title", e);
+                                    }
+                                }
+                            }}
+                            className="text-center font-bold text-lg h-9 border-transparent hover:border-input focus:border-input bg-transparent px-2 shadow-none w-full pointer-events-auto"
+                            placeholder={filename}
+                        />
+                    </div>
 
                     {/* Right: Action Buttons */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex-1 flex justify-end items-center gap-2">
                         <Button
-                            variant="default"
+                            variant="outline"
                             size="sm"
-                            onClick={handleSave}
-                            disabled={isSaving || isProcessing}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            onClick={() => {
+                                console.log("Share button onClick triggered");
+                                handleShareClick();
+                            }}
+                            disabled={isSaving}
+                            className={isSaving ? "opacity-50 cursor-not-allowed" : ""}
                         >
                             {isSaving ? (
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                             ) : (
-                                <Save className="w-4 h-4 mr-2" />
+                                <Share2 className="w-4 h-4 mr-2" />
                             )}
-                            {isSaving ? "Saving..." : "Save"}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={handleShareClick}>
-                            <Share2 className="w-4 h-4 mr-2" />
                             Share
                         </Button>
                         <Button

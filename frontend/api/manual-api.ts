@@ -27,12 +27,19 @@ export async function getPublicManual(manualId: string): Promise<ManualData> {
     return res.json();
 }
 
+import { auth } from "@/lib/firebase";
+
 // マニュアルの公開状態の更新
 export async function toggleManualPublish(manualId: string, isPublic: boolean) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+    const token = await user.getIdToken();
+
     const res = await fetch(`${API_BASE_URL}/manuals/${manualId}/publish`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ is_public: isPublic }),
     });
@@ -41,19 +48,24 @@ export async function toggleManualPublish(manualId: string, isPublic: boolean) {
 }
 
 // マニュアルの保存
-export async function saveManual(filename: string, steps: any[], videoFile: File | null) {
-    // Generate a cleaner manual_id from filename
-    const manualId = filename.replace(/\.[^/.]+$/, "").replace(/[^a-z0-9]/gi, '_').toLowerCase();
-
+export async function saveManual(manualId: string, title: string, steps: any[], videoFile: File | null) {
     const formData = new FormData();
     formData.append("manual_id", manualId);
+    formData.append("title", title);
     formData.append("steps", JSON.stringify(steps));
     if (videoFile) {
         formData.append("video", videoFile);
     }
 
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+    const token = await user.getIdToken();
+
     const response = await fetch(`${API_BASE_URL}/save-manual`, {
         method: "POST",
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
         body: formData,
     });
 
@@ -63,4 +75,23 @@ export async function saveManual(filename: string, steps: any[], videoFile: File
     }
 
     return await response.json();
+}
+
+// タイトルの更新
+export async function updateManualTitle(manualId: string, title: string) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+    const token = await user.getIdToken();
+
+    const res = await fetch(`${API_BASE_URL}/manuals/${manualId}/title`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ title }),
+    });
+
+    if (!res.ok) throw new Error('Failed to update title');
+    return res.json();
 }

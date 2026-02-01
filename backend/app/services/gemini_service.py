@@ -74,7 +74,7 @@ class GeminiService:
         self.model_name = os.getenv("MODEL_NAME", "gemini-3-flash-preview")
         self.temperature = 1.0 if self.model_name == "gemini-3-flash-preview" else 0.0
 
-    async def generate_manual_from_video(self, video_path: str, video_service, manual_id: str, manual_service, gcs_video_uri: Optional[str] = None) -> List[ManualStep]:
+    async def generate_manual_from_video(self, user_id: str, video_path: str, video_service, manual_id: str, manual_service, gcs_video_uri: Optional[str] = None) -> List[ManualStep]:
         """
         Main pipeline with Incremental Firestore Updates:
             1. Analyze video structure -> Update Firestore (Phase 1)
@@ -89,7 +89,7 @@ class GeminiService:
         if not structures:
             print("Phase 1 failed: No structure found.")
             # エラー状態更新などが必要だが、一旦終了
-            manual_service.update_manual_status(manual_id, "error")
+            manual_service.update_manual_status(user_id, manual_id, "error")
             return []
         
         print(f"Phase 1 complete. Found {len(structures)} steps.")
@@ -107,10 +107,10 @@ class GeminiService:
                 "image_url": None
             })
         
-        manual_service.init_manual_steps(manual_id, current_steps)
+        manual_service.init_manual_steps(user_id, manual_id, current_steps)
 
         # Phase 2: Image Extraction
-        manual_service.update_manual_status(manual_id, "extracting_images")
+        manual_service.update_manual_status(user_id, manual_id, "extracting_images")
         
         steps_for_extraction = [s.model_dump() for s in structures]
         print("Phase 2: Extracting images...")
@@ -124,7 +124,7 @@ class GeminiService:
         
         if not valid_steps:
              print("Phase 2 failed: No images extracted.")
-             manual_service.update_manual_status(manual_id, "error")
+             manual_service.update_manual_status(user_id, manual_id, "error")
              return []
 
         print(f"Phase 2 complete. Extracted {len(valid_steps)} images.")
@@ -141,7 +141,7 @@ class GeminiService:
         gcs_repo = GCSRepository()
         
         # Phase 3: Image Analysis Loop & Incremental Update
-        manual_service.update_manual_status(manual_id, "analyzing_details")
+        manual_service.update_manual_status(user_id, manual_id, "analyzing_details")
         print("Phase 3: Analyzing images sequentially for real-time updates...")
         
         final_steps = []
@@ -189,7 +189,7 @@ class GeminiService:
                     current_steps.append(step_dict)
                 
                 # [Firestore Update] 1ステップごとに更新
-                manual_service.update_manual_steps(manual_id, current_steps)
+                manual_service.update_manual_steps(user_id, manual_id, current_steps)
 
             # 4. Cleanup local image
             if local_file_path and os.path.exists(local_file_path):
@@ -200,7 +200,7 @@ class GeminiService:
                     print(f"Failed to delete local image {local_file_path}: {del_err}")
         
         print("Phase 3 complete.")
-        manual_service.complete_manual_job(manual_id, current_steps)
+        manual_service.complete_manual_job(user_id, manual_id, current_steps)
         return [ManualStep(**s) for s in current_steps]
 
     async def analyze_video_structure(self, video_path: str) -> List[StepStructure]:

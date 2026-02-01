@@ -1,4 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
+from app.core.security import get_current_user
 from fastapi.responses import StreamingResponse
 from app.services.gemini_service import GeminiService
 from app.services.video_service import VideoService
@@ -20,10 +21,10 @@ class AnalyzeRequest(BaseModel):
     title: str = "無題の動画"
 
 # Background Task Function
-async def run_video_analysis(video_url: str, manual_id: str, title: str):
+async def run_video_analysis(user_id: str, video_url: str, manual_id: str, title: str):
     file_path = None
     try:
-        print(f"Background Task Started: {manual_id}, {video_url}")
+        print(f"Background Task Started: {manual_id}, {video_url} for user {user_id}")
         
         # 1. Download Video
         blob_name = video_url
@@ -56,6 +57,7 @@ async def run_video_analysis(video_url: str, manual_id: str, title: str):
         manual_service = ManualService()
         
         await gemini_service.generate_manual_from_video(
+            user_id=user_id,
             video_path=file_path,
             video_service=video_service,
             manual_id=manual_id,
@@ -67,7 +69,7 @@ async def run_video_analysis(video_url: str, manual_id: str, title: str):
         print(f"Background Task Error: {e}")
         # Update status to error
         try:
-             ManualService().update_manual_status(manual_id, "error")
+             ManualService().update_manual_status(user_id, manual_id, "error")
         except:
              print("Failed to update status to error")
     finally:
@@ -78,7 +80,8 @@ async def run_video_analysis(video_url: str, manual_id: str, title: str):
 @router.post("/analyze", status_code=202)
 async def analyze_video(
     request: AnalyzeRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user)
 ):
     # 1. Parse Params
     video_url = request.video_url
@@ -88,11 +91,11 @@ async def analyze_video(
     try:
         # 2. Initialize Job in Firestore (STATUS: queued)
         manual_service = ManualService()
-        manual_service.create_manual_job(manual_id, title)
+        manual_service.create_manual_job(user_id, manual_id, title)
         
         # 3. Add to Background Tasks
         # We pass the GCS URL (or blob name) so the background task performs the download
-        background_tasks.add_task(run_video_analysis, video_url, manual_id, title)
+        background_tasks.add_task(run_video_analysis, user_id, video_url, manual_id, title)
 
         # 4. Return immediately
         return {
