@@ -1,6 +1,52 @@
 import { getPublicManual } from "@/api/manual-api";
 import { notFound } from "next/navigation";
-import Image from "next/image";
+import { ManualPreview } from "@/components/features/manual/ManualPreview";
+
+function generateMarkdown(manual: any): string {
+    let md = `# ${manual.title}\n\n`;
+
+    manual.steps.forEach((step: any, index: number) => {
+        md += `## Step ${index + 1}: ${step.title}\n`;
+        if (step.timestamp) {
+            md += `**Timestamp:** ${step.timestamp}\n\n`;
+        }
+        md += `${step.description}\n\n`;
+
+        if (step.image_url) {
+            // Combine highlight_box and mask_boxes for preview rendering
+            const combinedMasks = [];
+            if (step.highlight_box) {
+                combinedMasks.push({
+                    type: 'highlight',
+                    label: 'highlight',
+                    box_2d: [step.highlight_box.ymin, step.highlight_box.xmin, step.highlight_box.ymax, step.highlight_box.xmax]
+                });
+            }
+            if (step.mask_boxes) {
+                step.mask_boxes.forEach((m: any) => {
+                    combinedMasks.push({
+                        type: 'privacy',
+                        label: m.label,
+                        box_2d: [m.box.ymin, m.box.xmin, m.box.ymax, m.box.xmax]
+                    });
+                });
+            }
+
+            let imageUrl = step.image_url;
+            if (combinedMasks.length > 0) {
+                const masksJson = JSON.stringify(combinedMasks);
+                const encodedMasks = encodeURIComponent(masksJson);
+                imageUrl = `${step.image_url}?masks=${encodedMasks}`;
+            }
+
+            md += `![Step ${index + 1} Image](${imageUrl})\n\n`;
+        }
+
+        md += `---\n\n`;
+    });
+
+    return md;
+}
 
 // Next.js 15+ or recent versions might require params to be awaited or handled differently in some contexts,
 // but for standard dynamic routes:
@@ -11,6 +57,8 @@ export default async function SharePage(props: { params: Promise<{ id: string }>
     if (!manual) {
         notFound();
     }
+
+    const markdown = generateMarkdown(manual);
 
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -27,43 +75,7 @@ export default async function SharePage(props: { params: Promise<{ id: string }>
                     </div>
                 </header>
 
-                <div className="space-y-12">
-                    {manual.steps.map((step, index) => (
-                        <div key={index} className="bg-white shadow rounded-lg overflow-hidden ring-1 ring-black/5">
-                            <div className="p-6 border-b border-gray-100">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                                        <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 text-sm font-bold">
-                                            {index + 1}
-                                        </span>
-                                        {step.title}
-                                    </h2>
-                                    {step.timestamp && (
-                                        <span className="text-sm font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                            {step.timestamp}
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-gray-600 leading-relaxed whitespace-pre-wrap ml-10">
-                                    {step.description}
-                                </p>
-                            </div>
-                            {step.image_url && (
-                                <div className="relative aspect-video w-full bg-gray-100 border-t border-gray-100">
-                                    {/* Using unoptimized image for simplicity if next.config is set. 
-                                        Otherwise might need remotePatterns. */}
-                                    <Image
-                                        src={step.image_url}
-                                        alt={step.title}
-                                        fill
-                                        className="object-contain"
-                                        unoptimized
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
+                <ManualPreview markdown={markdown} />
             </div>
         </div>
     );

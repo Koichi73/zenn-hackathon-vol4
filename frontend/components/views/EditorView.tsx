@@ -33,8 +33,8 @@ export function EditorView() {
             return;
         }
 
-        if (!steps || !filename) {
-            console.error("No steps or filename");
+        if (!steps || steps.length === 0) {
+            console.error("No steps available");
             alert("手順書のデータが不足しています。");
             return;
         }
