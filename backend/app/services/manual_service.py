@@ -52,13 +52,12 @@ class ManualService:
 
     # --- 保存・更新系 ---
 
-    async def save_manual(self, steps: List[Dict], manual_id: str, video_path: str = None) -> Dict[str, Any]:
+    async def save_manual(self, user_id: str, steps: List[Dict], manual_id: str, title: str = None, video_path: str = None) -> Dict[str, Any]:
         """
         画像、動画、および手順書JSONをGCSにアップロードし、Firestoreにメタデータを保存する
         """
         updated_steps = []
-        now_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        full_id = f"{manual_id}_{now_timestamp}"
+        full_id = manual_id
 
         # 1. 各ステップの画像をアップロードしてURLを置換
         for step in steps:
@@ -109,12 +108,20 @@ class ManualService:
         )
 
         # 4. Firestore にメタデータを保存
+        # Extract thumbnail from first step
+        thumbnail_url = None
+        if updated_steps and len(updated_steps) > 0:
+            first_step_image = updated_steps[0].get("image_url")
+            if first_step_image and first_step_image.startswith("http"):
+                thumbnail_url = first_step_image
+        
         metadata = {
             "id": full_id,
-            "title": manual_id,
+            "title": title or manual_id,
             "manual_id": manual_id,
             "gcs_json_path": json_path,
             "gcs_video_path": gcs_video_path,
+            "thumbnail_url": thumbnail_url,
             "step_count": len(updated_steps),
             "status": "completed",
             "is_public": False, # 保存直後は非公開
@@ -123,12 +130,11 @@ class ManualService:
         }
 
         try:
-            # ログインユーザーのID (現状は固定)
-            user_id = "test-user-001"
+            # ログインユーザーのID
             collection_path = f"users/{user_id}/manuals"
             
             await asyncio.to_thread(
-                self.firestore_repository.create_document,
+                self.firestore_repository.update_document,
                 collection_path,
                 full_id,
                 metadata
@@ -150,7 +156,7 @@ class ManualService:
 
     # --- 新しい分析フロー（Firestore段階更新）用 ---
 
-    def create_manual_job(self, manual_id: str, title: str, video_path: str = None) -> str:
+    def create_manual_job(self, user_id: str, manual_id: str, title: str, video_path: str = None) -> str:
         """
         解析ジョブの初期レコードを作成
         """
@@ -169,8 +175,6 @@ class ManualService:
         }
         
         # 2. Firestore作成
-        # ログインユーザーのID (現状は固定/あとで引数にする)
-        user_id = "test-user-001"
         collection_path = f"users/{user_id}/manuals"
         
         self.firestore_repository.create_document(
@@ -180,20 +184,18 @@ class ManualService:
         )
         return manual_id
 
-    def update_manual_status(self, manual_id: str, status: str):
+    def update_manual_status(self, user_id: str, manual_id: str, status: str):
         """ステータスのみ更新"""
-        user_id = "test-user-001"
         collection_path = f"users/{user_id}/manuals"
         self.firestore_repository.update_document(collection_path, manual_id, {
             "status": status,
             "updated_at": firestore.SERVER_TIMESTAMP
         })
 
-    def init_manual_steps(self, manual_id: str, steps_structure: List[Dict]):
+    def init_manual_steps(self, user_id: str, manual_id: str, steps_structure: List[Dict]):
         """
         Phase 1完了時: ステップの骨組み（タイトル・タイムスタンプ）を保存
         """
-        user_id = "test-user-001"
         collection_path = f"users/{user_id}/manuals"
         
         # 配列をそのまま保存
@@ -220,15 +222,22 @@ class ManualService:
         """
         pass # 下記 update_all_steps を使う
 
-    def update_manual_steps(self, manual_id: str, all_steps: List[Dict], status: str = None):
+    def update_manual_steps(self, user_id: str, manual_id: str, all_steps: List[Dict], status: str = None):
         """
         ステップ配列全体を更新する（進捗反映用）
         """
-        user_id = "test-user-001"
         collection_path = f"users/{user_id}/manuals"
+        
+        # Extract thumbnail from first step
+        thumbnail_url = None
+        if all_steps and len(all_steps) > 0:
+            first_step_image = all_steps[0].get("image_url")
+            if first_step_image and first_step_image.startswith("http"):
+                thumbnail_url = first_step_image
         
         data = {
             "steps": all_steps,
+            "thumbnail_url": thumbnail_url,
             "updated_at": firestore.SERVER_TIMESTAMP
         }
         if status:
@@ -236,15 +245,22 @@ class ManualService:
 
         self.firestore_repository.update_document(collection_path, manual_id, data)
 
-    def complete_manual_job(self, manual_id: str, final_steps: List[Dict]):
+    def complete_manual_job(self, user_id: str, manual_id: str, final_steps: List[Dict]):
         """
         全工程完了
         """
-        user_id = "test-user-001"
         collection_path = f"users/{user_id}/manuals"
+        
+        # Extract thumbnail from first step
+        thumbnail_url = None
+        if final_steps and len(final_steps) > 0:
+            first_step_image = final_steps[0].get("image_url")
+            if first_step_image and first_step_image.startswith("http"):
+                thumbnail_url = first_step_image
         
         self.firestore_repository.update_document(collection_path, manual_id, {
             "steps": final_steps,
+            "thumbnail_url": thumbnail_url,
             "status": "completed",
             "updated_at": firestore.SERVER_TIMESTAMP
         })
@@ -267,3 +283,42 @@ class ManualService:
         except Exception as e:
             print(f"Error updating visibility: {e}")
             return False
+
+    def update_manual_title(self, user_id: str, manual_id: str, title: str) -> bool:
+        """
+        マニュアルのタイトルのみを更新する
+        """
+        try:
+            collection_path = f"users/{user_id}/manuals"
+            self.firestore_repository.update_document(collection_path, manual_id, {
+                "title": title,
+                "updated_at": firestore.SERVER_TIMESTAMP
+            })
+            return True
+        except Exception as e:
+            print(f"Error updating manual title: {e}")
+            return False
+
+    def get_user_manuals(self, user_id: str) -> List[Dict[str, Any]]:
+        """
+        特定のユーザーのマニュアル一覧を取得する
+        """
+        collection_path = f"users/{user_id}/manuals"
+        try:
+            # Firestoreから全件取得
+            # 実際にはページネーションやソートが必要だが、一旦全件取得
+            all_docs = self.firestore_repository.get_all_documents(collection_path)
+            
+            # 作成日時の降順でソート (Firestoreから取得時点でソートされていない場合)
+            # created_at が firestore.SERVER_TIMESTAMP の場合、ローカルでは datetime オブジェクト等として扱える
+            # Noneの場合を考慮してソート
+            # FirestoreのTimestampはtzinfoを持つため、datetime.minもtzinfoを持つ必要がある
+            from datetime import timezone
+            min_date = datetime.min.replace(tzinfo=timezone.utc)
+            
+            all_docs.sort(key=lambda x: x.get('created_at') or min_date, reverse=True)
+            
+            return all_docs
+        except Exception as e:
+            print(f"Error getting user manuals: {e}")
+            return []

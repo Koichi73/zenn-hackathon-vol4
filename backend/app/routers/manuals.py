@@ -1,4 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
+from app.core.security import get_current_user
 from app.services.manual_service import ManualService
 from pydantic import BaseModel
 from typing import Optional
@@ -18,8 +19,10 @@ class PublishRequest(BaseModel):
 @router.post("/save-manual")
 async def save_manual(
     manual_id: str = Form(...),
+    title: str = Form(...),
     steps: str = Form(...),
-    video: Optional[UploadFile] = File(None)
+    video: Optional[UploadFile] = File(None),
+    user_id: str = Depends(get_current_user)
 ):
     try:
         steps_list = json.loads(steps)
@@ -34,8 +37,10 @@ async def save_manual(
                 shutil.copyfileobj(video.file, buffer)
         
         result = await service.save_manual(
+            user_id=user_id,
             steps=steps_list, 
             manual_id=manual_id,
+            title=title,
             video_path=video_path
         )
         
@@ -61,9 +66,12 @@ async def get_public_manual(manual_id: str):
     return manual
 
 @router.put("/manuals/{manual_id}/publish")
-async def toggle_manual_publish(manual_id: str, request: PublishRequest):
+async def toggle_manual_publish(
+    manual_id: str, 
+    request: PublishRequest,
+    user_id: str = Depends(get_current_user)
+):
     # ログインユーザーのIDを取得する
-    user_id = "test-user-001"
     
     service = ManualService()
     success = service.update_visibility(user_id, manual_id, request.is_public)
@@ -72,3 +80,29 @@ async def toggle_manual_publish(manual_id: str, request: PublishRequest):
         raise HTTPException(status_code=404, detail="Manual not found")
         
     return {"status": "success", "is_public": request.is_public}
+
+class TitleUpdateRequest(BaseModel):
+    title: str
+
+@router.put("/manuals/{manual_id}/title")
+async def update_manual_title(
+    manual_id: str,
+    request: TitleUpdateRequest,
+    user_id: str = Depends(get_current_user)
+):
+    service = ManualService()
+    success = service.update_manual_title(user_id, manual_id, request.title)
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update title")
+        
+    return {"status": "success", "title": request.title}
+
+@router.get("/manuals")
+async def list_user_manuals(user_id: str = Depends(get_current_user)):
+    # ログインユーザーのIDを取得する
+    
+    service = ManualService()
+    manuals = service.get_user_manuals(user_id)
+    
+    return {"manuals": manuals}

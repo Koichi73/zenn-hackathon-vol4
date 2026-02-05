@@ -6,6 +6,8 @@ import { Upload, Video, Loader2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import {
     Dialog,
     DialogContent,
@@ -16,9 +18,46 @@ import {
 
 export default function DashboardPage() {
     const router = useRouter();
-    const { processVideo, isProcessing, steps, error, processingStage, uploadProgress, status, manualId } = useVideo();
+    const { processVideo, isProcessing, steps, error, processingStage, uploadProgress, status, manualId, reset } = useVideo();
+    const [manuals, setManuals] = useState<any[]>([]);
+    const [isLoadingManuals, setIsLoadingManuals] = useState(true);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+
+    const fetchManuals = async (user: any) => {
+        if (!user) return;
+        try {
+            const token = await user.getIdToken();
+            const response = await fetch("http://localhost:8000/api/manuals", {
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                console.log("Fetched manuals:", data.manuals); // DEBUG LOG
+                setManuals(data.manuals || []);
+            } else {
+                console.error("Failed to fetch manuals");
+            }
+        } catch (error) {
+            console.error("Error fetching manuals:", error);
+        } finally {
+            setIsLoadingManuals(false);
+        }
+    };
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                fetchManuals(user);
+            } else {
+                // Handle not logged in if necessary, effectively mostly handled by middleware/layout
+                setIsLoadingManuals(false);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
 
     // Redirect to editor when frame extraction is complete (or manual is done/loaded)
     useEffect(() => {
@@ -58,7 +97,10 @@ export default function DashboardPage() {
         <div className="container mx-auto px-4 py-8">
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-2xl font-bold">Dashboard</h1>
-                <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+                <Dialog open={isUploadOpen} onOpenChange={(open) => {
+                    if (open) reset();
+                    setIsUploadOpen(open);
+                }}>
                     <DialogTrigger asChild>
                         <Button>
                             <Upload className="mr-2 h-4 w-4" />
@@ -148,17 +190,50 @@ export default function DashboardPage() {
                 </Dialog>
             </div>
 
-            {/* Empty State or List of Manuals */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Placeholder items for visual check */}
-                <div className="border rounded-lg p-6 bg-card text-card-foreground shadow-sm">
-                    <div className="h-40 bg-muted rounded-md mb-4 flex items-center justify-center text-muted-foreground">
-                        Thumbnail
-                    </div>
-                    <h3 className="font-semibold text-lg mb-2">Welcome to Manual AI</h3>
-                    <p className="text-sm text-muted-foreground">This is a placeholder manual to demonstrate the layout.</p>
+            {/* List of Manuals */}
+            {isLoadingManuals ? (
+                <div className="flex justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-            </div>
+            ) : manuals.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                    <p className="text-muted-foreground">No manuals found. Upload a video to create one!</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {manuals.map((manual) => (
+                        <div
+                            key={manual.id}
+                            className="border rounded-lg p-6 bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                            onClick={() => router.push(`/editor/${manual.id}`)}
+                        >
+                            <div className="h-40 bg-muted rounded-md mb-4 flex items-center justify-center text-muted-foreground relative overflow-hidden">
+                                {manual.thumbnail_url ? (
+                                    <img src={manual.thumbnail_url} alt={manual.title} className="object-cover w-full h-full" />
+                                ) : (
+                                    <Video className="h-12 w-12 opacity-20" />
+                                )}
+                                <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                                    {manual.step_count || 0} Steps
+                                </div>
+                            </div>
+                            <h3 className="font-semibold text-lg mb-1 truncate" title={manual.title}>
+                                {manual.title || "Untitled Manual"}
+                            </h3>
+                            <div className="flex justify-between items-center mt-4">
+                                <span className={`text-xs px-2 py-1 rounded-full ${manual.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                    manual.status === 'error' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                                    }`}>
+                                    {manual.status || 'Unknown'}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    {manual.created_at ? new Date(manual.created_at).toLocaleDateString() : ''}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
