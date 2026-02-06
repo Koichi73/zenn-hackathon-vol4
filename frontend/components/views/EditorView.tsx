@@ -66,7 +66,7 @@ export function EditorView() {
     // Let's replace the top part first to add imports and state.
 
     // Video widget state
-    const [isVideoWidgetOpen, setIsVideoWidgetOpen] = useState(true);
+    const [isVideoWidgetOpen, setIsVideoWidgetOpen] = useState(false);
     const [isVideoWidgetExpanded, setIsVideoWidgetExpanded] = useState(true);
 
     // Video ref
@@ -398,13 +398,6 @@ export function EditorView() {
                                                             <span className="text-xs text-muted-foreground font-mono">{step.timestamp}</span>
                                                         </div>
                                                     </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="text-red-400 hover:text-red-600 hover:bg-red-50"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </Button>
                                                 </div>
 
                                                 {/* Image Area - Inline Editor */}
@@ -439,12 +432,7 @@ export function EditorView() {
                                                     </div>
                                                 </div>
 
-                                                {/* Description Editor */}
                                                 <div className="p-6 bg-white">
-                                                    <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-slate-700">
-                                                        <PenTool className="w-4 h-4" />
-                                                        Description
-                                                    </div>
                                                     <Textarea
                                                         value={step.description || ''}
                                                         onChange={(e) => handleDescriptionChange(index, e.target.value)}
@@ -473,16 +461,10 @@ export function EditorView() {
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <button
-                                            onClick={() => setIsVideoWidgetExpanded(!isVideoWidgetExpanded)}
-                                            className="p-1 hover:bg-slate-200 rounded text-slate-500"
-                                        >
-                                            {isVideoWidgetExpanded ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
-                                        </button>
-                                        <button
                                             onClick={() => setIsVideoWidgetOpen(false)}
                                             className="p-1 hover:bg-slate-200 rounded text-slate-500"
                                         >
-                                            <X className="w-3 h-3" />
+                                            <Minimize2 className="w-3 h-3" />
                                         </button>
                                     </div>
                                 </div>

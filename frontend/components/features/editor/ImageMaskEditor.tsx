@@ -315,10 +315,7 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                 )}
             </div>
 
-            <p className="text-xs text-slate-500 flex items-center gap-1">
-                <MousePointer2 className="w-3 h-3" />
-                Click on a mask/frame to resize or move. Click empty space to deselect.
-            </p>
+
         </div>
     );
 }
