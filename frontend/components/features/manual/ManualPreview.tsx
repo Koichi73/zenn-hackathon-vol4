@@ -3,24 +3,14 @@
 import React, { useState } from 'react';
 import ReactMarkdown, { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, Printer } from 'lucide-react';
+import { CommentSection } from '@/components/features/comments/CommentSection';
 
 interface ManualPreviewProps {
     markdown: string;
+    manualId: string;
 }
 
-export function ManualPreview({ markdown }: ManualPreviewProps) {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(markdown);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    const handlePrint = () => {
-        window.print();
-    };
+export function ManualPreview({ markdown, manualId }: ManualPreviewProps) {
 
     const ImageRenderer: Components['img'] = ({ src, alt }) => {
         if (!src || typeof src !== 'string') return null;
@@ -29,12 +19,15 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
         let cleanSrc = src;
 
         try {
-            const urlObj = new URL(src, window.location.origin); // Handle relative URLs
-            const masksParam = urlObj.searchParams.get('masks');
-            if (masksParam) {
-                masks = JSON.parse(decodeURIComponent(masksParam));
-                urlObj.searchParams.delete('masks');
-                cleanSrc = urlObj.toString();
+            // Check if window is defined (client-side only)
+            if (typeof window !== 'undefined') {
+                const urlObj = new URL(src, window.location.origin); // Handle relative URLs
+                const masksParam = urlObj.searchParams.get('masks');
+                if (masksParam) {
+                    masks = JSON.parse(decodeURIComponent(masksParam));
+                    urlObj.searchParams.delete('masks');
+                    cleanSrc = urlObj.toString();
+                }
             }
         } catch (e) {
             console.error("Failed to parse masks from URL", e);
@@ -45,7 +38,7 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
                 <img
                     src={cleanSrc}
                     alt={alt}
-                    className="w-full h-auto rounded-lg shadow-sm"
+                    className="w-full h-auto rounded-md shadow-sm"
                 />
                 {masks.length > 0 && (
                     <div className="absolute inset-0 pointer-events-none">
@@ -77,20 +70,29 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
         );
     };
 
+    // Split markdown by horizontal rules to get individual steps
+    const steps = markdown.split('---\n\n').filter(step => step.trim());
+
     return (
-        <div className="w-full max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden border print:shadow-none print:border-none">
-            <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center print:hidden">
-                <h2 className="font-semibold text-gray-700">Generated Manual</h2>
-            </div>
-            <div className="p-8 prose max-w-none">
-                <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                        img: ImageRenderer
-                    }}
-                >
-                    {markdown}
-                </ReactMarkdown>
+        <div className="bg-white rounded-lg border p-8 shadow-sm">
+            <div className="prose max-w-none">
+                {steps.map((stepContent, index) => (
+                    <div key={index} className="mb-10 pb-10 border-b last:border-b-0">
+                        <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                                img: ImageRenderer
+                            }}
+                        >
+                            {stepContent}
+                        </ReactMarkdown>
+
+                        {/* Comment Section */}
+                        <div className="not-prose">
+                            <CommentSection manualId={manualId} stepIndex={index} />
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );

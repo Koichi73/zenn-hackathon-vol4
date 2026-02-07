@@ -65,8 +65,8 @@ export default async function SharePage(props: { params: Promise<{ id: string }>
 
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto bg-muted/30">
-                <div className="max-w-4xl mx-auto p-8">
-                    <ManualPreview markdown={markdown} />
+                <div className="max-w-6xl mx-auto p-8">
+                    <ManualPreview markdown={markdown} manualId={params.id} />
                 </div>
             </div>
         </div>
