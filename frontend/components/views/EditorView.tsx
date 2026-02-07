@@ -296,7 +296,6 @@ export function EditorView() {
                                                             <h3 className="font-semibold text-base text-slate-900 border-none p-0 focus-visible:ring-0">
                                                                 Step {index + 1}
                                                             </h3>
-                                                            <span className="text-xs text-muted-foreground font-mono">{step.timestamp}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -361,7 +360,7 @@ export function EditorView() {
                     /* Preview Mode: Full Screen */
                     <div className="flex-1 overflow-y-auto bg-slate-100/50 print:bg-white print:overflow-visible">
                         <div className="max-w-4xl mx-auto p-8 print:p-0 print:max-w-none">
-                            <ManualPreview markdown={generateMarkdown()} manualId={manualId || ''} readOnly={true} />
+                            <ManualPreview markdown={generateMarkdown()} manualId={manualId || ''} readOnly={true} showComments={false} />
                         </div>
                     </div>
                 )}

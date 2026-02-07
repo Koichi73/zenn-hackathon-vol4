@@ -1,13 +1,13 @@
 import { getPublicManual } from "@/api/manual-api";
 import { notFound } from "next/navigation";
 import { ManualPreview } from "@/components/features/manual/ManualPreview";
-import { SharePageHeader } from "@/components/features/share/SharePageHeader";
 
 function generateMarkdown(manual: any): string {
     let md = '';
 
     manual.steps.forEach((step: any, index: number) => {
-        md += `## Step ${index + 1}: ${step.title}\n\n`;
+        md += `## Step ${index + 1}: ${step.title}\n`;
+        md += `${step.description}\n\n`;
 
         if (step.image_url) {
             // Combine highlight_box and mask_boxes for preview rendering
@@ -39,16 +39,12 @@ function generateMarkdown(manual: any): string {
             md += `![Step ${index + 1} Image](${imageUrl})\n\n`;
         }
 
-        md += `${step.description}\n\n`;
-
         md += `---\n\n`;
     });
 
     return md;
 }
 
-// Next.js 15+ or recent versions might require params to be awaited or handled differently in some contexts,
-// but for standard dynamic routes:
 export default async function SharePage(props: { params: Promise<{ id: string }> }) {
     const params = await props.params;
     const manual = await getPublicManual(params.id);
@@ -60,14 +56,21 @@ export default async function SharePage(props: { params: Promise<{ id: string }>
     const markdown = generateMarkdown(manual);
 
     return (
-        <div className="flex flex-col min-h-screen bg-background">
-            <SharePageHeader title={manual.title} />
+        <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-4xl mx-auto space-y-8">
+                <header className="text-center">
+                    <h1 className="text-3xl font-bold text-gray-900">{manual.title}</h1>
+                    <div className="mt-2 text-sm text-gray-500 flex justify-center gap-4">
+                        {manual.updated_at && (
+                            <span>最終更新: {new Date(manual.updated_at).toLocaleDateString('ja-JP')}</span>
+                        )}
+                        <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs items-center flex">
+                            公開中
+                        </span>
+                    </div>
+                </header>
 
-            {/* Main Content */}
-            <div className="flex-1 overflow-y-auto bg-muted/30">
-                <div className="max-w-6xl mx-auto p-8">
-                    <ManualPreview markdown={markdown} manualId={params.id} />
-                </div>
+                <ManualPreview markdown={markdown} manualId={params.id} />
             </div>
         </div>
     );
