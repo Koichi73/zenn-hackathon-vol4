@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Video, Loader2 } from 'lucide-react';
+import { Upload, Video, Loader2, MessageCircle } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { getAllUnreadCounts } from "@/api/comment-api";
 import {
     Dialog,
     DialogContent,
@@ -23,6 +24,7 @@ export default function DashboardPage() {
     const [isLoadingManuals, setIsLoadingManuals] = useState(true);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [unreadCounts, setUnreadCounts] = useState<{ [manualId: string]: number }>({});
 
     const fetchManuals = async (user: any) => {
         if (!user) return;
@@ -37,6 +39,19 @@ export default function DashboardPage() {
                 const data = await response.json();
                 console.log("Fetched manuals:", data.manuals); // DEBUG LOG
                 setManuals(data.manuals || []);
+
+                // 未読コメント数を取得
+                if (data.manuals && data.manuals.length > 0) {
+                    const manualIds = data.manuals.map((m: any) => m.id);
+                    console.log("Fetching unread counts for manual IDs:", manualIds);
+                    try {
+                        const counts = await getAllUnreadCounts(manualIds);
+                        console.log("Unread counts received:", counts);
+                        setUnreadCounts(counts);
+                    } catch (err) {
+                        console.error("Failed to fetch unread counts:", err);
+                    }
+                }
             } else {
                 console.error("Failed to fetch manuals");
             }
@@ -201,37 +216,49 @@ export default function DashboardPage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {manuals.map((manual) => (
-                        <div
-                            key={manual.id}
-                            className="border rounded-lg p-6 bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                            onClick={() => router.push(`/editor/${manual.id}`)}
-                        >
-                            <div className="h-40 bg-muted rounded-md mb-4 flex items-center justify-center text-muted-foreground relative overflow-hidden">
-                                {manual.thumbnail_url ? (
-                                    <img src={manual.thumbnail_url} alt={manual.title} className="object-cover w-full h-full" />
-                                ) : (
-                                    <Video className="h-12 w-12 opacity-20" />
+                    {manuals.map((manual) => {
+                        const unreadCount = unreadCounts[manual.id] || 0;
+
+                        return (
+                            <div
+                                key={manual.id}
+                                className="border rounded-lg p-6 bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow cursor-pointer relative"
+                                onClick={() => router.push(`/editor/${manual.id}`)}
+                            >
+                                {/* Unread Badge */}
+                                {unreadCount > 0 && (
+                                    <div className="absolute top-3 right-3 bg-red-500 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md z-10">
+                                        <MessageCircle className="w-3 h-3" />
+                                        <span className="font-medium">{unreadCount}</span>
+                                    </div>
                                 )}
-                                <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                                    {manual.step_count || 0} Steps
+
+                                <div className="h-40 bg-muted rounded-md mb-4 flex items-center justify-center text-muted-foreground relative overflow-hidden">
+                                    {manual.thumbnail_url ? (
+                                        <img src={manual.thumbnail_url} alt={manual.title} className="object-cover w-full h-full" />
+                                    ) : (
+                                        <Video className="h-12 w-12 opacity-20" />
+                                    )}
+                                    <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                                        {manual.step_count || 0} Steps
+                                    </div>
+                                </div>
+                                <h3 className="font-semibold text-lg mb-1 truncate" title={manual.title}>
+                                    {manual.title || "Untitled Manual"}
+                                </h3>
+                                <div className="flex justify-between items-center mt-4">
+                                    <span className={`text-xs px-2 py-1 rounded-full ${manual.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                        manual.status === 'error' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                        {manual.status || 'Unknown'}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {manual.created_at ? new Date(manual.created_at).toLocaleDateString() : ''}
+                                    </span>
                                 </div>
                             </div>
-                            <h3 className="font-semibold text-lg mb-1 truncate" title={manual.title}>
-                                {manual.title || "Untitled Manual"}
-                            </h3>
-                            <div className="flex justify-between items-center mt-4">
-                                <span className={`text-xs px-2 py-1 rounded-full ${manual.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                    manual.status === 'error' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                                    }`}>
-                                    {manual.status || 'Unknown'}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                    {manual.created_at ? new Date(manual.created_at).toLocaleDateString() : ''}
-                                </span>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
