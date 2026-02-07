@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Download, Cast as MaskIcon, Play, Maximize2, Minimize2, X, ChevronRight, PenTool, Save, Share2, Loader2, ChevronLeft, List } from 'lucide-react';
+import { Download, Cast as MaskIcon, X, ChevronRight, PenTool, Save, Share2, Loader2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { ManualPreview } from "@/components/features/manual/ManualPreview";
 import { ImageMaskEditor } from "@/components/features/editor/ImageMaskEditor";
@@ -15,14 +15,12 @@ import { saveManual, updateManualTitle } from "@/api/manual-api";
 import { ShareDialog } from "@/components/features/share/ShareDialog";
 import { CommentSidebar } from "@/components/features/comments/CommentSidebar";
 import { markManualAsRead } from "@/api/comment-api";
-import { useEffect } from 'react';
 
 export function EditorView() {
-    const { steps, filename, title, setTitle, updateStep, reset, isProcessing, videoUrl, videoFile, manualId, setManualId } = useVideo();
+    const { steps, filename, title, setTitle, updateStep, reset, isProcessing, manualId, setManualId } = useVideo();
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
     const [isSaving, setIsSaving] = useState(false);
     const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-    const [isTocCollapsed, setIsTocCollapsed] = useState(false);
 
     // エディターを開いたときに既読マーク
     useEffect(() => {
@@ -34,29 +32,19 @@ export function EditorView() {
     }, [manualId]);
 
     const handleShareClick = async () => {
-        console.log("=== Share Button Clicked ===");
-        console.log("manualId:", manualId);
-        console.log("steps:", steps?.length);
-        console.log("filename:", filename);
-        console.log("isSaving:", isSaving);
-
         if (!manualId) {
-            console.error("No manualId available");
             alert("共有機能を使う前に、まず保存してください。");
             return;
         }
 
         if (!steps || steps.length === 0) {
-            console.error("No steps available");
             alert("手順書のデータが不足しています。");
             return;
         }
 
         setIsSaving(true);
         try {
-            console.log("Saving manual before sharing...");
-            await saveManual(manualId, title || filename, steps, videoFile);
-            console.log("Manual saved successfully, opening share dialog");
+            await saveManual(manualId, title || filename, steps);
             setIsShareDialogOpen(true);
         } catch (error) {
             console.error("Save error:", error);
@@ -66,28 +54,6 @@ export function EditorView() {
         }
     };
 
-    // ... (rest of the component)
-
-    // Video widget state and other logic remains same...
-    // Only showing changed parts to be safe with context limits, 
-    // but replace_file_content needs contiguous block. 
-    // I will use replace_file_content for specific blocks or I need to provide larger context.
-
-    // Since I'm using replace_file_content with line numbers, I'll split into chunks or use a large chunk if I'm replacing the whole init part.
-    // The previous view_file showed lines 1-495.
-
-    // Let's replace the top part first to add imports and state.
-
-    // Video widget state
-    const [isVideoWidgetOpen, setIsVideoWidgetOpen] = useState(true);
-    const [isVideoWidgetExpanded, setIsVideoWidgetExpanded] = useState(true);
-
-    // Video ref
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
-
-    // Refs for scrolling to steps
     const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     const getStep = (index: number) => steps ? steps[index] : null;
@@ -103,7 +69,6 @@ export function EditorView() {
         const step = getStep(stepIndex);
         if (!step) return;
 
-        // Split combined masks back into highlight_box and mask_boxes
         const highlightMask = newMasks.find(m => m.type === 'highlight');
         const privacyMasks = newMasks.filter(m => m.type === 'privacy' || !m.type).map(m => ({
             label: m.label || 'privacy',
@@ -136,58 +101,19 @@ export function EditorView() {
         stepRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
 
-    const handleTimeUpdate = () => {
-        if (videoRef.current) {
-            setCurrentTime(videoRef.current.currentTime);
-        }
-    };
-
-    const handleLoadedMetadata = () => {
-        if (videoRef.current) {
-            setDuration(videoRef.current.duration);
-        }
-    };
-
-    const formatTime = (time: number) => {
-        const minutes = Math.floor(time / 60);
-        const seconds = Math.floor(time % 60);
-        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    };
-
-    const convertTimestampToSeconds = (timestamp: string) => {
-        const parts = timestamp.split(':').map(Number);
-        if (parts.length === 2) {
-            return parts[0] * 60 + parts[1];
-        } else if (parts.length === 3) {
-            return parts[0] * 3600 + parts[1] * 60 + parts[2];
-        }
-        return 0;
-    };
-
-    const handleStepClick = (timestamp: string) => {
-        if (videoRef.current) {
-            videoRef.current.currentTime = convertTimestampToSeconds(timestamp);
-            videoRef.current.play();
-        }
-    };
-
     const generateMarkdown = () => {
         if (!steps) return '';
-        let md = `# Video Manual: ${filename}\n\n`;
+        let md = `# ${filename}\n\n`;
 
         steps.forEach((step: any, index: number) => {
             md += `## Step ${index + 1}: ${step.title}\n`;
-            md += `**Timestamp:** ${step.timestamp}\n\n`;
             md += `${step.description}\n\n`;
 
             if (step.image_url) {
                 const isAbsolute = step.image_url.startsWith("http");
                 const fullImageUrl = isAbsolute ? step.image_url : `http://localhost:8000${step.image_url}`;
 
-                // Encode masks into the URL for the preview renderer
                 let imageUrlForMarkdown = fullImageUrl;
-
-                // Combine highlight_box and mask_boxes for preview rendering (which expects a flat list)
                 const combinedMasks = [];
                 if (step.highlight_box) {
                     combinedMasks.push({
@@ -213,11 +139,6 @@ export function EditorView() {
                 }
 
                 md += `![Step ${index + 1} Image](${imageUrlForMarkdown})\n`;
-
-                // Add note about masked areas if present
-                if (step.mask_boxes && step.mask_boxes.length > 0) {
-                    md += `\n> [!NOTE]\n> This image contains ${step.mask_boxes.length} masked area(s) for privacy.\n`;
-                }
                 md += `\n`;
             }
 
@@ -229,7 +150,6 @@ export function EditorView() {
     if (!steps && isProcessing) {
         return (
             <div className="flex flex-col h-[calc(100vh-64px)]">
-                {/* Project Toolbar Skeleton */}
                 <div className="border-b bg-white sticky top-0 z-40 shadow-sm">
                     <div className="container mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
                         <Skeleton className="h-9 w-[200px]" />
@@ -240,8 +160,6 @@ export function EditorView() {
                         </div>
                     </div>
                 </div>
-
-                {/* Main Content Skeleton */}
                 <div className="flex flex-1 overflow-hidden bg-slate-50">
                     <div className="w-full h-full relative overflow-y-auto px-4 py-8 sm:px-8">
                         <div className="max-w-6xl mx-auto space-y-8 pb-32">
@@ -314,7 +232,6 @@ export function EditorView() {
                                 if (manualId && title) {
                                     try {
                                         await updateManualTitle(manualId, title);
-                                        console.log("Title updated");
                                     } catch (e) {
                                         console.error("Failed to update title", e);
                                     }
@@ -330,10 +247,7 @@ export function EditorView() {
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                                console.log("Share button onClick triggered");
-                                handleShareClick();
-                            }}
+                            onClick={handleShareClick}
                             disabled={isSaving}
                             className={isSaving ? "opacity-50 cursor-not-allowed" : ""}
                         >
@@ -361,48 +275,6 @@ export function EditorView() {
             <div className="flex flex-1 overflow-hidden print:overflow-visible print:block print:h-auto relative bg-slate-50">
                 {viewMode === 'edit' ? (
                     <div className="w-full h-full relative overflow-y-auto">
-                        {/* Left Sidebar: Table of Contents */}
-                        <div className={`fixed left-4 top-36 bottom-4 bg-white border rounded-lg shadow-sm overflow-hidden z-20 flex flex-col transition-all duration-300 ${isTocCollapsed ? 'w-[60px]' : 'w-[250px]'
-                            }`}>
-                            <div className="p-4 border-b bg-white flex items-center justify-between">
-                                {!isTocCollapsed && (
-                                    <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                        Table of Contents
-                                    </h2>
-                                )}
-                                <button
-                                    onClick={() => setIsTocCollapsed(!isTocCollapsed)}
-                                    className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                    title={isTocCollapsed ? 'Expand' : 'Collapse'}
-                                >
-                                    {isTocCollapsed ? (
-                                        <ChevronRight className="w-4 h-4 text-gray-600" />
-                                    ) : (
-                                        <ChevronLeft className="w-4 h-4 text-gray-600" />
-                                    )}
-                                </button>
-                            </div>
-                            {!isTocCollapsed && (
-                                <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
-                                    {steps.map((step, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() => {
-                                                scrollToStep(index);
-                                                handleStepClick(step.timestamp);
-                                            }}
-                                            className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors truncate flex items-center gap-2"
-                                        >
-                                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-slate-200 text-xs font-medium text-slate-600 shrink-0">
-                                                {index + 1}
-                                            </span>
-                                            <span className="truncate">{step.title || `Step ${index + 1}`}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
                         {/* Main Editor Area */}
                         <div className="w-full min-h-full px-4 py-8 sm:px-8">
                             <div className="max-w-6xl mx-auto space-y-8 pb-32">
@@ -427,13 +299,6 @@ export function EditorView() {
                                                             <span className="text-xs text-muted-foreground font-mono">{step.timestamp}</span>
                                                         </div>
                                                     </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="text-red-400 hover:text-red-600 hover:bg-red-50"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </Button>
                                                 </div>
 
                                                 {/* Image Area - Inline Editor */}
@@ -468,12 +333,7 @@ export function EditorView() {
                                                     </div>
                                                 </div>
 
-                                                {/* Description Editor */}
                                                 <div className="p-6 bg-white">
-                                                    <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-slate-700">
-                                                        <PenTool className="w-4 h-4" />
-                                                        Description
-                                                    </div>
                                                     <Textarea
                                                         value={step.description || ''}
                                                         onChange={(e) => handleDescriptionChange(index, e.target.value)}
@@ -487,78 +347,6 @@ export function EditorView() {
                                 ))}
                             </div>
                         </div>
-
-                        {/* Floating Video Widget (Hidden on Print) */}
-                        {isVideoWidgetOpen && videoUrl && (
-                            <div className={cn(
-                                "fixed bottom-6 right-6 z-50 transition-all duration-300 ease-in-out bg-white shadow-2xl rounded-xl border border-slate-200 overflow-hidden print:hidden",
-                                isVideoWidgetExpanded ? "w-[360px]" : "w-[200px]"
-                            )}>
-                                {/* Widget Header */}
-                                <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b cursor-move">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                        <span className="text-xs font-semibold text-slate-700">Original Video</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <button
-                                            onClick={() => setIsVideoWidgetExpanded(!isVideoWidgetExpanded)}
-                                            className="p-1 hover:bg-slate-200 rounded text-slate-500"
-                                        >
-                                            {isVideoWidgetExpanded ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
-                                        </button>
-                                        <button
-                                            onClick={() => setIsVideoWidgetOpen(false)}
-                                            className="p-1 hover:bg-slate-200 rounded text-slate-500"
-                                        >
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Video Player */}
-                                <div className={cn(
-                                    "bg-slate-900 transition-all duration-300 relative",
-                                    isVideoWidgetExpanded ? "aspect-video" : "h-12"
-                                )}>
-                                    <video
-                                        ref={videoRef}
-                                        src={videoUrl}
-                                        className="w-full h-full"
-                                        onTimeUpdate={handleTimeUpdate}
-                                        onLoadedMetadata={handleLoadedMetadata}
-                                        controls={isVideoWidgetExpanded}
-                                    />
-                                </div>
-
-                                {/* Progress Bar & Time Display */}
-                                {isVideoWidgetExpanded && (
-                                    <div className="p-3 bg-white">
-                                        <div className="w-full bg-slate-100 rounded-full h-1 mb-2">
-                                            <div
-                                                className="bg-indigo-600 h-1 rounded-full transition-all"
-                                                style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                                            />
-                                        </div>
-                                        <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                                            <span>{formatTime(currentTime)}</span>
-                                            <span>{formatTime(duration)}</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Hidden Re-open button for video widget if closed (Hidden on Print) */}
-                        {!isVideoWidgetOpen && (
-                            <Button
-                                onClick={() => setIsVideoWidgetOpen(true)}
-                                className="fixed bottom-6 right-6 z-50 rounded-full w-12 h-12 shadow-lg print:hidden"
-                                size="icon"
-                            >
-                                <Play className="w-4 h-4" />
-                            </Button>
-                        )}
 
                         {/* Right Sidebar: Comments */}
                         {manualId && (

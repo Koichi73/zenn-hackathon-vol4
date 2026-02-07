@@ -48,14 +48,11 @@ export async function toggleManualPublish(manualId: string, isPublic: boolean) {
 }
 
 // マニュアルの保存
-export async function saveManual(manualId: string, title: string, steps: any[], videoFile: File | null) {
+export async function saveManual(manualId: string, title: string, steps: any[]) {
     const formData = new FormData();
     formData.append("manual_id", manualId);
     formData.append("title", title);
     formData.append("steps", JSON.stringify(steps));
-    if (videoFile) {
-        formData.append("video", videoFile);
-    }
 
     const user = auth.currentUser;
     if (!user) throw new Error("User not authenticated");
