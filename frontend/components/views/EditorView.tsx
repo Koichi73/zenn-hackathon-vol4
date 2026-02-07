@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { saveManual, updateManualTitle } from "@/api/manual-api";
 import { ShareDialog } from "@/components/features/share/ShareDialog";
 import { CommentSidebar } from "@/components/features/comments/CommentSidebar";
+import { markManualAsRead } from "@/api/comment-api";
+import { useEffect } from 'react';
 
 export function EditorView() {
     const { steps, filename, title, setTitle, updateStep, reset, isProcessing, videoUrl, videoFile, manualId, setManualId } = useVideo();
@@ -21,6 +23,15 @@ export function EditorView() {
     const [isSaving, setIsSaving] = useState(false);
     const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
     const [isTocCollapsed, setIsTocCollapsed] = useState(false);
+
+    // エディターを開いたときに既読マーク
+    useEffect(() => {
+        if (manualId) {
+            markManualAsRead(manualId).catch(err => {
+                console.error('Failed to mark manual as read:', err);
+            });
+        }
+    }, [manualId]);
 
     const handleShareClick = async () => {
         console.log("=== Share Button Clicked ===");

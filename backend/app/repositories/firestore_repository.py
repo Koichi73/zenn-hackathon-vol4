@@ -57,6 +57,14 @@ class FirestoreRepository:
         doc_ref = self.db.collection(collection_name).document(document_id)
         doc_ref.update(data)
 
+    # ドキュメントの設定（作成または上書き）
+    def set_document(self, collection_name: str, document_id: str, data: Dict[str, Any]) -> None:
+        """
+        ドキュメントを作成または上書き
+        """
+        doc_ref = self.db.collection(collection_name).document(document_id)
+        doc_ref.set(data)
+
 
     # ドキュメントの削除
     def delete_document(self, collection_name: str, document_id: str) -> None:
