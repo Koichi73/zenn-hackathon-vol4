@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Download, Cast as MaskIcon, Play, Maximize2, Minimize2, X, ChevronRight, PenTool, Save, Share2, Loader2 } from 'lucide-react';
+import { Download, Cast as MaskIcon, X, ChevronRight, PenTool, Save, Share2, Loader2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { ManualPreview } from "@/components/features/manual/ManualPreview";
 import { ImageMaskEditor } from "@/components/features/editor/ImageMaskEditor";
@@ -15,7 +15,7 @@ import { saveManual, updateManualTitle } from "@/api/manual-api";
 import { ShareDialog } from "@/components/features/share/ShareDialog";
 
 export function EditorView() {
-    const { steps, filename, title, setTitle, updateStep, reset, isProcessing, videoUrl, videoFile, manualId, setManualId } = useVideo();
+    const { steps, filename, title, setTitle, updateStep, reset, isProcessing, manualId, setManualId } = useVideo();
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
     const [isSaving, setIsSaving] = useState(false);
     const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
@@ -42,7 +42,7 @@ export function EditorView() {
         setIsSaving(true);
         try {
             console.log("Saving manual before sharing...");
-            await saveManual(manualId, title || filename, steps, videoFile);
+            await saveManual(manualId, title || filename, steps);
             console.log("Manual saved successfully, opening share dialog");
             setIsShareDialogOpen(true);
         } catch (error) {
@@ -64,15 +64,6 @@ export function EditorView() {
     // The previous view_file showed lines 1-495.
 
     // Let's replace the top part first to add imports and state.
-
-    // Video widget state
-    const [isVideoWidgetOpen, setIsVideoWidgetOpen] = useState(false);
-    const [isVideoWidgetExpanded, setIsVideoWidgetExpanded] = useState(true);
-
-    // Video ref
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
 
     // Refs for scrolling to steps
     const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -121,41 +112,6 @@ export function EditorView() {
 
     const scrollToStep = (index: number) => {
         stepRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    };
-
-    const handleTimeUpdate = () => {
-        if (videoRef.current) {
-            setCurrentTime(videoRef.current.currentTime);
-        }
-    };
-
-    const handleLoadedMetadata = () => {
-        if (videoRef.current) {
-            setDuration(videoRef.current.duration);
-        }
-    };
-
-    const formatTime = (time: number) => {
-        const minutes = Math.floor(time / 60);
-        const seconds = Math.floor(time % 60);
-        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    };
-
-    const convertTimestampToSeconds = (timestamp: string) => {
-        const parts = timestamp.split(':').map(Number);
-        if (parts.length === 2) {
-            return parts[0] * 60 + parts[1];
-        } else if (parts.length === 3) {
-            return parts[0] * 3600 + parts[1] * 60 + parts[2];
-        }
-        return 0;
-    };
-
-    const handleStepClick = (timestamp: string) => {
-        if (videoRef.current) {
-            videoRef.current.currentTime = convertTimestampToSeconds(timestamp);
-            videoRef.current.play();
-        }
     };
 
     const generateMarkdown = () => {
@@ -361,7 +317,6 @@ export function EditorView() {
                                         key={index}
                                         onClick={() => {
                                             scrollToStep(index);
-                                            handleStepClick(step.timestamp);
                                         }}
                                         className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors truncate flex items-center gap-2"
                                     >
@@ -447,71 +402,8 @@ export function EditorView() {
                             </div>
                         </div>
 
-                        {/* Floating Video Widget (Hidden on Print) */}
-                        {isVideoWidgetOpen && videoUrl && (
-                            <div className={cn(
-                                "fixed bottom-6 right-6 z-50 transition-all duration-300 ease-in-out bg-white shadow-2xl rounded-xl border border-slate-200 overflow-hidden print:hidden",
-                                isVideoWidgetExpanded ? "w-[360px]" : "w-[200px]"
-                            )}>
-                                {/* Widget Header */}
-                                <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b cursor-move">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                        <span className="text-xs font-semibold text-slate-700">Original Video</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <button
-                                            onClick={() => setIsVideoWidgetOpen(false)}
-                                            className="p-1 hover:bg-slate-200 rounded text-slate-500"
-                                        >
-                                            <Minimize2 className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Video Player */}
-                                <div className={cn(
-                                    "bg-slate-900 transition-all duration-300 relative",
-                                    isVideoWidgetExpanded ? "aspect-video" : "h-12"
-                                )}>
-                                    <video
-                                        ref={videoRef}
-                                        src={videoUrl}
-                                        className="w-full h-full"
-                                        onTimeUpdate={handleTimeUpdate}
-                                        onLoadedMetadata={handleLoadedMetadata}
-                                        controls={isVideoWidgetExpanded}
-                                    />
-                                </div>
-
-                                {/* Progress Bar & Time Display */}
-                                {isVideoWidgetExpanded && (
-                                    <div className="p-3 bg-white">
-                                        <div className="w-full bg-slate-100 rounded-full h-1 mb-2">
-                                            <div
-                                                className="bg-indigo-600 h-1 rounded-full transition-all"
-                                                style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                                            />
-                                        </div>
-                                        <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                                            <span>{formatTime(currentTime)}</span>
-                                            <span>{formatTime(duration)}</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         {/* Hidden Re-open button for video widget if closed (Hidden on Print) */}
-                        {!isVideoWidgetOpen && (
-                            <Button
-                                onClick={() => setIsVideoWidgetOpen(true)}
-                                className="fixed bottom-6 right-6 z-50 rounded-full w-12 h-12 shadow-lg print:hidden"
-                                size="icon"
-                            >
-                                <Play className="w-4 h-4" />
-                            </Button>
-                        )}
+                        {/* Video Widget Removed by user request */}
                     </div>
                 ) : (
                     /* Preview Mode: Full Screen */

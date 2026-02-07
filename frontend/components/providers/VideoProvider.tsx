@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
-import { ref, uploadBytes, uploadBytesResumable } from "firebase/storage";
+import { ref, uploadBytesResumable } from "firebase/storage";
 import { db, storage, auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 
@@ -39,8 +39,6 @@ interface VideoContextType {
   uploadProgress: number;
   status: string; // "analyzing_structure", "extracting_images", "analyzing_details", "completed", "error"
   error: string | null;
-  videoUrl: string | null;
-  videoFile: File | null;
   manualId: string | null;
   setManualId: (id: string | null) => void;
   processVideo: (file: File) => Promise<void>;
@@ -59,8 +57,6 @@ export function VideoProvider({ children }: { children: ReactNode }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [manualId, setManualId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -80,7 +76,7 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     const user_id = currentUser.uid;
     const docRef = doc(db, "users", user_id, "manuals", manualId);
 
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+    const unsubscribe = onSnapshot(docRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         console.log("Firestore Update:", data.status);
@@ -125,13 +121,11 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     setError(null);
     setSteps(null);
     setFilename(file.name);
-    setVideoFile(file);
     // manualId set to null to clear previous listener
     setManualId(null);
 
-    // Local preview
-    const url = URL.createObjectURL(file);
-    setVideoUrl(url);
+    // Local preview (Not stored in state anymore as widget is removed)
+    // const url = URL.createObjectURL(file);
 
     try {
       // 1. Generate ID
@@ -225,12 +219,7 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     setProcessingStage('idle');
     setUploadProgress(0);
     setStatus("");
-    setVideoFile(null);
     setManualId(null);
-    if (videoUrl) {
-      URL.revokeObjectURL(videoUrl);
-    }
-    setVideoUrl(null);
   };
 
   return (
@@ -245,8 +234,6 @@ export function VideoProvider({ children }: { children: ReactNode }) {
         uploadProgress,
         status,
         error,
-        videoUrl,
-        videoFile,
         manualId,
         setManualId,
         processVideo,
