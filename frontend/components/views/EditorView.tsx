@@ -535,7 +535,7 @@ export function EditorView() {
                     /* Preview Mode: Full Screen */
                     <div className="flex-1 overflow-y-auto bg-slate-100/50 print:bg-white print:overflow-visible">
                         <div className="max-w-4xl mx-auto p-8 print:p-0 print:max-w-none">
-                            <ManualPreview markdown={generateMarkdown()} />
+                            <ManualPreview markdown={generateMarkdown()} manualId={manualId || ''} readOnly={true} />
                         </div>
                     </div>
                 )}

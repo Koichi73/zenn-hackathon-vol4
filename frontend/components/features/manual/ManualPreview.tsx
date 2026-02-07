@@ -8,9 +8,10 @@ import { CommentSection } from '@/components/features/comments/CommentSection';
 interface ManualPreviewProps {
     markdown: string;
     manualId: string;
+    readOnly?: boolean;
 }
 
-export function ManualPreview({ markdown, manualId }: ManualPreviewProps) {
+export function ManualPreview({ markdown, manualId, readOnly = false }: ManualPreviewProps) {
 
     const ImageRenderer: Components['img'] = ({ src, alt }) => {
         if (!src || typeof src !== 'string') return null;
@@ -81,7 +82,20 @@ export function ManualPreview({ markdown, manualId }: ManualPreviewProps) {
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             components={{
-                                img: ImageRenderer
+                                img: ImageRenderer,
+                                // Fix hydration error: use div for paragraphs containing images
+                                p: ({ node, children }) => {
+                                    // Check if paragraph contains an image
+                                    const hasImage = node?.children?.some(
+                                        (child: any) => child.tagName === 'img'
+                                    );
+
+                                    if (hasImage) {
+                                        return <div className="my-4">{children}</div>;
+                                    }
+
+                                    return <p>{children}</p>;
+                                }
                             }}
                         >
                             {stepContent}
@@ -89,7 +103,7 @@ export function ManualPreview({ markdown, manualId }: ManualPreviewProps) {
 
                         {/* Comment Section */}
                         <div className="not-prose">
-                            <CommentSection manualId={manualId} stepIndex={index} />
+                            <CommentSection manualId={manualId} stepIndex={index} readOnly={readOnly} />
                         </div>
                     </div>
                 ))}

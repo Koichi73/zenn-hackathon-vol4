@@ -7,9 +7,10 @@ import { MessageCircle, Send, User, ChevronDown } from 'lucide-react';
 interface CommentSectionProps {
     manualId: string;
     stepIndex: number;
+    readOnly?: boolean;
 }
 
-export function CommentSection({ manualId, stepIndex }: CommentSectionProps) {
+export function CommentSection({ manualId, stepIndex, readOnly = false }: CommentSectionProps) {
     const [comments, setComments] = useState<Comment[]>([]);
     const [content, setContent] = useState('');
     const [authorName, setAuthorName] = useState('');
@@ -27,7 +28,13 @@ export function CommentSection({ manualId, stepIndex }: CommentSectionProps) {
         try {
             setIsLoading(true);
             const fetchedComments = await getComments(manualId, stepIndex);
-            setComments(fetchedComments);
+            // Sort comments in descending order (newest first)
+            const sortedComments = fetchedComments.sort((a, b) => {
+                const timeA = a.created_at?._seconds || new Date(a.created_at).getTime() / 1000;
+                const timeB = b.created_at?._seconds || new Date(b.created_at).getTime() / 1000;
+                return timeB - timeA;
+            });
+            setComments(sortedComments);
         } catch (err) {
             console.error('Failed to load comments:', err);
             setComments([]);
@@ -136,50 +143,52 @@ export function CommentSection({ manualId, stepIndex }: CommentSectionProps) {
                         </div>
                     )}
 
-                    {/* コメント投稿フォーム */}
-                    <form onSubmit={handleSubmit} className="space-y-3">
-                        <div>
-                            <label htmlFor={`author-${stepIndex}`} className="block text-sm font-medium text-gray-700 mb-1">
-                                名前 (任意)
-                            </label>
-                            <input
-                                type="text"
-                                id={`author-${stepIndex}`}
-                                value={authorName}
-                                onChange={(e) => setAuthorName(e.target.value)}
-                                placeholder="匿名"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                disabled={isSubmitting}
-                                maxLength={50}
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor={`content-${stepIndex}`} className="block text-sm font-medium text-gray-700 mb-1">
-                                コメント
-                            </label>
-                            <textarea
-                                id={`content-${stepIndex}`}
-                                value={content}
-                                onChange={(e) => setContent(e.target.value)}
-                                placeholder="コメントを入力してください"
-                                rows={3}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                disabled={isSubmitting}
-                                maxLength={500}
-                            />
-                        </div>
-                        {error && (
-                            <div className="text-red-600 text-sm">{error}</div>
-                        )}
-                        <button
-                            type="submit"
-                            disabled={isSubmitting || !content.trim()}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                        >
-                            <Send className="w-4 h-4" />
-                            {isSubmitting ? '投稿中...' : 'コメントを投稿'}
-                        </button>
-                    </form>
+                    {/* コメント投稿フォーム - 読み取り専用モードでは非表示 */}
+                    {!readOnly && (
+                        <form onSubmit={handleSubmit} className="space-y-3">
+                            <div>
+                                <label htmlFor={`author-${stepIndex}`} className="block text-sm font-medium text-gray-700 mb-1">
+                                    名前 (任意)
+                                </label>
+                                <input
+                                    type="text"
+                                    id={`author-${stepIndex}`}
+                                    value={authorName}
+                                    onChange={(e) => setAuthorName(e.target.value)}
+                                    placeholder="匿名"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    disabled={isSubmitting}
+                                    maxLength={50}
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor={`content-${stepIndex}`} className="block text-sm font-medium text-gray-700 mb-1">
+                                    コメント
+                                </label>
+                                <textarea
+                                    id={`content-${stepIndex}`}
+                                    value={content}
+                                    onChange={(e) => setContent(e.target.value)}
+                                    placeholder="コメントを入力してください"
+                                    rows={3}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                    disabled={isSubmitting}
+                                    maxLength={500}
+                                />
+                            </div>
+                            {error && (
+                                <div className="text-red-600 text-sm">{error}</div>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={isSubmitting || !content.trim()}
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <Send className="w-4 h-4" />
+                                {isSubmitting ? '投稿中...' : 'コメントを投稿'}
+                            </button>
+                        </form>
+                    )}
                 </>
             )}
         </div>
