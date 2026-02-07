@@ -79,9 +79,7 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
 
     return (
         <div className="w-full max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden border print:shadow-none print:border-none">
-            <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center print:hidden">
-                <h2 className="font-semibold text-gray-700">Generated Manual</h2>
-            </div>
+
             <div className="p-8 prose max-w-none">
                 <ReactMarkdown
                     remarkPlugins={[remarkGfm]}

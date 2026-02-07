@@ -116,11 +116,11 @@ export function EditorView() {
 
     const generateMarkdown = () => {
         if (!steps) return '';
-        let md = `# Video Manual: ${filename}\n\n`;
+        let md = `# ${filename}\n\n`;
 
         steps.forEach((step: any, index: number) => {
             md += `## Step ${index + 1}: ${step.title}\n`;
-            md += `**Timestamp:** ${step.timestamp}\n\n`;
+
             md += `${step.description}\n\n`;
 
             if (step.image_url) {
@@ -158,9 +158,7 @@ export function EditorView() {
                 md += `![Step ${index + 1} Image](${imageUrlForMarkdown})\n`;
 
                 // Add note about masked areas if present
-                if (step.mask_boxes && step.mask_boxes.length > 0) {
-                    md += `\n> [!NOTE]\n> This image contains ${step.mask_boxes.length} masked area(s) for privacy.\n`;
-                }
+
                 md += `\n`;
             }
 
