@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from "@/lib/utils";
 import { saveManual, updateManualTitle } from "@/api/manual-api";
 import { ShareDialog } from "@/components/features/share/ShareDialog";
+import { CommentSidebar } from "@/components/features/comments/CommentSidebar";
 
 export function EditorView() {
     const { steps, filename, title, setTitle, updateStep, reset, isProcessing, videoUrl, videoFile, manualId, setManualId } = useVideo();
@@ -529,6 +530,15 @@ export function EditorView() {
                             >
                                 <Play className="w-4 h-4" />
                             </Button>
+                        )}
+
+                        {/* Right Sidebar: Comments */}
+                        {manualId && (
+                            <CommentSidebar
+                                manualId={manualId}
+                                steps={steps}
+                                onStepClick={(stepIndex) => scrollToStep(stepIndex)}
+                            />
                         )}
                     </div>
                 ) : (
