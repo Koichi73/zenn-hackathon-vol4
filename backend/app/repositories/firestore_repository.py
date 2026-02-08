@@ -11,9 +11,7 @@ class FirestoreRepository:
     def __init__(self):
         self.project_id = os.getenv("PROJECT_ID")
         self.database_name = os.getenv("FIRESTORE_DATABASE")
-        self.credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        self.db = firestore.Client.from_service_account_json(
-            self.credentials_path,
+        self.db = firestore.Client( # ADCを利用
             project=self.project_id,
             database=self.database_name
         )
