@@ -18,7 +18,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 export function GlobalHeader() {
-    const { user } = useAuth();
+    const { user, loading, isDemoMode } = useAuth();
     const router = useRouter();
 
     const handleLogout = async () => {
@@ -38,24 +38,34 @@ export function GlobalHeader() {
                         <span className="text-sm font-bold text-primary-foreground">M</span>
                     </div>
                     <span className="text-xl font-semibold text-foreground">Manual AI</span>
+                    {/* {isDemoMode && (
+                        <span className="ml-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200 rounded-full">
+                            Demo Mode
+                        </span>
+                    )} */}
                 </Link>
 
                 {/* Right: User Profile Avatar */}
                 <div className="flex items-center gap-4">
-                    {user ? (
+                    {loading ? (
+                        <div className="h-9 w-9 rounded-full bg-slate-100 animate-pulse" />
+                    ) : user ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="relative h-9 w-9 rounded-full">
-                                    <Avatar className="h-9 w-9">
-                                        <AvatarImage src={user.photoURL || "/placeholder-user.jpg"} alt={user.displayName || "User"} />
-                                        <AvatarFallback className="bg-primary text-primary-foreground">
-                                            {user.displayName ? user.displayName[0].toUpperCase() : <User className="h-4 w-4" />}
+                                    <Avatar className="h-9 w-9 border border-blue-600">
+                                        <AvatarFallback className="bg-white">
+                                            <User className="h-4 w-4 text-blue-600" />
                                         </AvatarFallback>
                                     </Avatar>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                                <DropdownMenuLabel className="font-normal">
+                                    <div className="flex flex-col space-y-1">
+                                        <p className="text-sm font-medium leading-none">{user.email}</p>
+                                    </div>
+                                </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={handleLogout}>
                                     Log out
