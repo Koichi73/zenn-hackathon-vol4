@@ -25,7 +25,20 @@ export function ShareDialog({ manualId, isOpen, onOpenChange }: ShareDialogProps
         if (isOpen && manualId) {
             setLoading(true);
             getPublicManual(manualId)
-                .then((data) => setIsPublic(!!data))
+                .then(async (data) => {
+                    if (!data) {
+                        // If not public, automatically publish it
+                        try {
+                            await toggleManualPublish(manualId, true);
+                            setIsPublic(true);
+                        } catch (err) {
+                            console.error("Failed to auto-publish:", err);
+                            setIsPublic(false);
+                        }
+                    } else {
+                        setIsPublic(true);
+                    }
+                })
                 .catch(() => setIsPublic(false))
                 .finally(() => setLoading(false));
         }
@@ -63,17 +76,9 @@ export function ShareDialog({ manualId, isOpen, onOpenChange }: ShareDialogProps
                     {loading && !isPublic ? (
                         <div className="flex items-center justify-center h-10 gap-2 text-slate-400">
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="text-xs">Processing...</span>
+                            <span className="text-xs">Generating Link...</span>
                         </div>
-                    ) : !isPublic ? (
-                        <Button
-                            onClick={handlePublish}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-10 text-xs font-bold uppercase tracking-wider transition-all"
-                            disabled={loading}
-                        >
-                            {loading ? <Loader2 className="w-3 h-3 mr-2 animate-spin" /> : "Generate Link"}
-                        </Button>
-                    ) : (
+                    ) : isPublic ? (
                         <div className="flex gap-1 animate-in fade-in duration-200">
                             <Input
                                 value={shareUrl}
@@ -91,6 +96,10 @@ export function ShareDialog({ manualId, isOpen, onOpenChange }: ShareDialogProps
                                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                                 <span className="ml-1.5 text-xs">{copied ? "Copied" : "Copy"}</span>
                             </Button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center h-10 text-red-500 text-xs">
+                            Failed to generate share link.
                         </div>
                     )}
                 </div>
