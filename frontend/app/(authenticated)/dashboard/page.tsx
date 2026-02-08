@@ -17,6 +17,19 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 
+const SAMPLES = [
+    {
+        id: 'sample-1',
+        title: 'sample1',
+        path: '/samples/sample1.mov',
+    },
+    {
+        id: 'sample-2',
+        title: 'sample2',
+        path: '/samples/sample2.mov',
+    },
+];
+
 export default function DashboardPage() {
     const router = useRouter();
     const { processVideo, isProcessing, steps, error, processingStage, uploadProgress, status, manualId, reset } = useVideo();
@@ -112,6 +125,21 @@ export default function DashboardPage() {
         }
     };
 
+    const handleSampleSelect = async (sample: typeof SAMPLES[0]) => {
+        try {
+            const response = await fetch(sample.path);
+            if (!response.ok) throw new Error("Sample video not found");
+            const blob = await response.blob();
+            const file = new File([blob], `${sample.id}.mov`, { type: 'video/quicktime' });
+            setIsUploadOpen(true);
+            reset();
+            await processVideo(file);
+        } catch (err) {
+            console.error("Failed to load sample video:", err);
+            // Error is handled by VideoProvider's error state
+        }
+    };
+
     return (
         <div className="container mx-auto px-4 py-8">
             <div className="flex justify-between items-center mb-8">
@@ -204,6 +232,39 @@ export default function DashboardPage() {
                                     )}
                                 </div>
                             </label>
+
+                            {/* Sample Videos Section */}
+                            {!isProcessing && (
+                                <div className="mt-8">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="h-px flex-1 bg-border" />
+                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                            Try with Samples
+                                        </span>
+                                        <div className="h-px flex-1 bg-border" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {SAMPLES.map((sample) => (
+                                            <button
+                                                key={sample.id}
+                                                onClick={() => handleSampleSelect(sample)}
+                                                className="flex flex-col items-start p-3 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all group text-left"
+                                            >
+                                                <div className="flex items-center gap-3 w-full">
+                                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                                                        <Video className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-foreground leading-none mb-1">
+                                                            {sample.title}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </DialogContent>
                 </Dialog>

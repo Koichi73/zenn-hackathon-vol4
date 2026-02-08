@@ -27,3 +27,6 @@ yarn-error.log*
 # Editor / IDE
 .vscode/
 .idea/
+
+# samples
+frontend/public/samples/
