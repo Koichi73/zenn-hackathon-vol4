@@ -97,6 +97,8 @@ export default function DashboardPage() {
         setIsDragging(false);
         const files = e.dataTransfer.files;
         if (files.length > 0) {
+            setIsUploadOpen(true);
+            reset();
             await processVideo(files[0]);
         }
     };
@@ -104,6 +106,8 @@ export default function DashboardPage() {
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files && files.length > 0) {
+            setIsUploadOpen(true);
+            reset();
             await processVideo(files[0]);
         }
     };
@@ -210,12 +214,49 @@ export default function DashboardPage() {
                 <div className="flex justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-            ) : manuals.length === 0 ? (
-                <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                    <p className="text-muted-foreground">No manuals found. Upload a video to create one!</p>
-                </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* Upload Area Card */}
+                    <div
+                        className={`
+                            border-2 border-dashed rounded-xl p-6 
+                            transition-all duration-300 cursor-pointer
+                            flex flex-col items-center justify-center text-center
+                            min-h-[280px] group relative overflow-hidden
+                            ${isDragging
+                                ? 'border-primary bg-primary/10 scale-[1.01] shadow-lg'
+                                : 'border-border bg-muted/20 hover:border-primary/50 hover:bg-muted/40 hover:shadow-sm'}
+                        `}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onClick={() => document.getElementById('video-upload-input-card')?.click()}
+                    >
+                        {/* subtle gradient background on hover */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                        <input
+                            id="video-upload-input-card"
+                            type="file"
+                            accept="video/mp4,video/quicktime,.mov"
+                            className="hidden"
+                            onChange={handleFileSelect}
+                            disabled={isProcessing}
+                        />
+
+                        <div className="relative z-10 flex flex-col items-center">
+                            <div className="bg-primary/10 p-5 rounded-full mb-5 group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
+                                <Upload className="w-10 h-10 text-primary" />
+                            </div>
+                            <h3 className="font-bold text-xl mb-2 text-foreground group-hover:text-primary transition-colors">
+                                Click or Drag to Upload
+                            </h3>
+                            <p className="text-sm text-muted-foreground max-w-[200px] leading-relaxed">
+                                MP4, MOV (Max 500MB)
+                            </p>
+                        </div>
+                    </div>
+
                     {manuals.map((manual) => {
                         const unreadCount = unreadCounts[manual.id] || 0;
 
