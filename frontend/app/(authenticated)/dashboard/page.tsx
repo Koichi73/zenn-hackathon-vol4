@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Video, Loader2, MessageCircle } from 'lucide-react';
+import { Upload, Video, Loader2, MessageCircle, Eye, Play, X } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -17,6 +17,19 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 
+const SAMPLES = [
+    {
+        id: 'sample-1',
+        title: 'sample1',
+        path: '/samples/sample1.mov',
+    },
+    {
+        id: 'sample-2',
+        title: 'sample2',
+        path: '/samples/sample2.mov',
+    },
+];
+
 export default function DashboardPage() {
     const router = useRouter();
     const { processVideo, isProcessing, steps, error, processingStage, uploadProgress, status, manualId, reset } = useVideo();
@@ -25,6 +38,7 @@ export default function DashboardPage() {
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [unreadCounts, setUnreadCounts] = useState<{ [manualId: string]: number }>({});
+    const [previewVideo, setPreviewVideo] = useState<string | null>(null);
 
     const fetchManuals = async (user: any) => {
         if (!user) return;
@@ -97,6 +111,8 @@ export default function DashboardPage() {
         setIsDragging(false);
         const files = e.dataTransfer.files;
         if (files.length > 0) {
+            setIsUploadOpen(true);
+            reset();
             await processVideo(files[0]);
         }
     };
@@ -104,7 +120,24 @@ export default function DashboardPage() {
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files && files.length > 0) {
+            setIsUploadOpen(true);
+            reset();
             await processVideo(files[0]);
+        }
+    };
+
+    const handleSampleSelect = async (sample: typeof SAMPLES[0]) => {
+        try {
+            const response = await fetch(sample.path);
+            if (!response.ok) throw new Error("Sample video not found");
+            const blob = await response.blob();
+            const file = new File([blob], `${sample.id}.mov`, { type: 'video/quicktime' });
+            setIsUploadOpen(true);
+            reset();
+            await processVideo(file);
+        } catch (err) {
+            console.error("Failed to load sample video:", err);
+            // Error is handled by VideoProvider's error state
         }
     };
 
@@ -200,6 +233,75 @@ export default function DashboardPage() {
                                     )}
                                 </div>
                             </label>
+
+                            {/* Sample Videos Section */}
+                            {!isProcessing && (
+                                <div className="mt-8">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="h-px flex-1 bg-border" />
+                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                            Try with Samples
+                                        </span>
+                                        <div className="h-px flex-1 bg-border" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {SAMPLES.map((sample) => (
+                                            <div key={sample.id} className="rounded-xl border border-border bg-card p-4 space-y-3">
+                                                {/* Video Title */}
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                                        <Video className="h-4 w-4" />
+                                                    </div>
+                                                    <p className="text-sm font-semibold text-foreground">
+                                                        {sample.title}
+                                                    </p>
+                                                </div>
+
+                                                {/* Action Buttons */}
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button
+                                                        onClick={() => setPreviewVideo(sample.path)}
+                                                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-background hover:bg-muted transition-colors text-xs font-medium"
+                                                    >
+                                                        <Play className="h-3.5 w-3.5" />
+                                                        Play
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleSampleSelect(sample)}
+                                                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs font-medium"
+                                                    >
+                                                        <Upload className="h-3.5 w-3.5" />
+                                                        Upload
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Video Preview Dialog */}
+                <Dialog open={!!previewVideo} onOpenChange={(open) => !open && setPreviewVideo(null)}>
+                    <DialogContent className="sm:max-w-3xl p-0 overflow-hidden bg-black border-none">
+                        <DialogTitle className="sr-only">Sample Video Preview</DialogTitle>
+                        <div className="relative pt-[56.25%] w-full">
+                            {previewVideo && (
+                                <video
+                                    src={previewVideo}
+                                    controls
+                                    autoPlay
+                                    className="absolute inset-0 w-full h-full"
+                                />
+                            )}
+                            <button
+                                onClick={() => setPreviewVideo(null)}
+                                className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors z-50"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -210,12 +312,43 @@ export default function DashboardPage() {
                 <div className="flex justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-            ) : manuals.length === 0 ? (
-                <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                    <p className="text-muted-foreground">No manuals found. Upload a video to create one!</p>
-                </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* Upload Area Card */}
+                    <div
+                        className={`
+                            border-2 border-dashed rounded-xl p-6 
+                            transition-all duration-300 cursor-pointer
+                            flex flex-col items-center justify-center text-center
+                            min-h-[280px] group relative overflow-hidden
+                            ${isDragging
+                                ? 'border-primary bg-primary/10 scale-[1.01] shadow-lg'
+                                : 'border-border bg-muted/20 hover:border-primary/50 hover:bg-muted/40 hover:shadow-sm'}
+                        `}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onClick={() => {
+                            reset();
+                            setIsUploadOpen(true);
+                        }}
+                    >
+                        {/* subtle gradient background on hover */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                        <div className="relative z-10 flex flex-col items-center">
+                            <div className="bg-primary/10 p-5 rounded-full mb-5 group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
+                                <Upload className="w-10 h-10 text-primary" />
+                            </div>
+                            <h3 className="font-bold text-xl mb-2 text-foreground group-hover:text-primary transition-colors">
+                                Click or Drag to Upload
+                            </h3>
+                            <p className="text-sm text-muted-foreground max-w-[200px] leading-relaxed">
+                                MP4, MOV (Max 500MB)
+                            </p>
+                        </div>
+                    </div>
+
                     {manuals.map((manual) => {
                         const unreadCount = unreadCounts[manual.id] || 0;
 
