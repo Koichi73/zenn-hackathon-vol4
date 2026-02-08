@@ -68,19 +68,11 @@ class ManualService:
         )
 
         # 2. Firestore にメタデータを保存
-        # Extract thumbnail from first step
-        thumbnail_url = None
-        if steps and len(steps) > 0:
-            first_step_image = steps[0].get("image_url")
-            if first_step_image and first_step_image.startswith("http"):
-                thumbnail_url = first_step_image
-        
         metadata = {
             "id": manual_id,
             "title": title or manual_id,
             "manual_id": manual_id,
             "gcs_json_path": json_path,
-            "thumbnail_url": thumbnail_url,
             "step_count": len(steps),
             "status": "completed",
             "updated_at": firestore.SERVER_TIMESTAMP,
@@ -89,7 +81,6 @@ class ManualService:
         }
 
         try:
-            # ログインユーザーのID
             collection_path = f"users/{user_id}/manuals"
             
             await asyncio.to_thread(
@@ -184,16 +175,8 @@ class ManualService:
         """
         collection_path = f"users/{user_id}/manuals"
         
-        # Extract thumbnail from first step
-        thumbnail_url = None
-        if all_steps and len(all_steps) > 0:
-            first_step_image = all_steps[0].get("image_url")
-            if first_step_image and first_step_image.startswith("http"):
-                thumbnail_url = first_step_image
-        
         data = {
             "steps": all_steps,
-            "thumbnail_url": thumbnail_url,
             "updated_at": firestore.SERVER_TIMESTAMP
         }
         if status:
