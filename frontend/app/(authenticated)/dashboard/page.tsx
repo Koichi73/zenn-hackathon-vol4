@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Video, Loader2, MessageCircle } from 'lucide-react';
+import { Upload, Video, Loader2, MessageCircle, Eye, Play, X } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -38,6 +38,7 @@ export default function DashboardPage() {
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [unreadCounts, setUnreadCounts] = useState<{ [manualId: string]: number }>({});
+    const [previewVideo, setPreviewVideo] = useState<string | null>(null);
 
     const fetchManuals = async (user: any) => {
         if (!user) return;
@@ -245,26 +246,56 @@ export default function DashboardPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         {SAMPLES.map((sample) => (
-                                            <button
-                                                key={sample.id}
-                                                onClick={() => handleSampleSelect(sample)}
-                                                className="flex flex-col items-start p-3 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all group text-left"
-                                            >
-                                                <div className="flex items-center gap-3 w-full">
+                                            <div key={sample.id} className="relative group">
+                                                <button
+                                                    onClick={() => handleSampleSelect(sample)}
+                                                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+                                                >
                                                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
                                                         <Video className="h-5 w-5" />
                                                     </div>
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-foreground leading-none mb-1">
-                                                            {sample.title}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </button>
+                                                    <p className="text-sm font-semibold text-foreground leading-none">
+                                                        {sample.title}
+                                                    </p>
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setPreviewVideo(sample.path);
+                                                    }}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                                                    title="Preview video"
+                                                >
+                                                    <Play className="h-4 w-4 fill-current" />
+                                                </button>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Video Preview Dialog */}
+                <Dialog open={!!previewVideo} onOpenChange={(open) => !open && setPreviewVideo(null)}>
+                    <DialogContent className="sm:max-w-3xl p-0 overflow-hidden bg-black border-none">
+                        <DialogTitle className="sr-only">Sample Video Preview</DialogTitle>
+                        <div className="relative pt-[56.25%] w-full">
+                            {previewVideo && (
+                                <video
+                                    src={previewVideo}
+                                    controls
+                                    autoPlay
+                                    className="absolute inset-0 w-full h-full"
+                                />
+                            )}
+                            <button
+                                onClick={() => setPreviewVideo(null)}
+                                className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors z-50"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -291,19 +322,13 @@ export default function DashboardPage() {
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
-                        onClick={() => document.getElementById('video-upload-input-card')?.click()}
+                        onClick={() => {
+                            reset();
+                            setIsUploadOpen(true);
+                        }}
                     >
                         {/* subtle gradient background on hover */}
                         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                        <input
-                            id="video-upload-input-card"
-                            type="file"
-                            accept="video/mp4,video/quicktime,.mov"
-                            className="hidden"
-                            onChange={handleFileSelect}
-                            disabled={isProcessing}
-                        />
 
                         <div className="relative z-10 flex flex-col items-center">
                             <div className="bg-primary/10 p-5 rounded-full mb-5 group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
