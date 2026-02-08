@@ -1,26 +1,18 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import ReactMarkdown, { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, Printer } from 'lucide-react';
+import { CommentSection } from '@/components/features/comments/CommentSection';
 
 interface ManualPreviewProps {
     markdown: string;
+    manualId: string;
+    readOnly?: boolean;
+    showComments?: boolean;
 }
 
-export function ManualPreview({ markdown }: ManualPreviewProps) {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(markdown);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    const handlePrint = () => {
-        window.print();
-    };
+export function ManualPreview({ markdown, manualId, readOnly = false, showComments = true }: ManualPreviewProps) {
 
     const ImageRenderer: Components['img'] = ({ src, alt }) => {
         if (!src || typeof src !== 'string') return null;
@@ -29,12 +21,22 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
         let cleanSrc = src;
 
         try {
-            const urlObj = new URL(src, window.location.origin); // Handle relative URLs
+            // Server-side safe URL parsing
+            const isBrowser = typeof window !== 'undefined';
+            const base = isBrowser ? window.location.origin : 'http://localhost';
+
+            const urlObj = new URL(src, base);
             const masksParam = urlObj.searchParams.get('masks');
             if (masksParam) {
                 masks = JSON.parse(decodeURIComponent(masksParam));
                 urlObj.searchParams.delete('masks');
-                cleanSrc = urlObj.toString();
+                // Only use the new URL if we are in the browser to avoid domain issues during SSR
+                if (isBrowser) {
+                    cleanSrc = urlObj.toString();
+                } else {
+                    // During SSR, just strip the masks param manually or keep original
+                    cleanSrc = src.split('?')[0];
+                }
             }
         } catch (e) {
             console.error("Failed to parse masks from URL", e);
@@ -77,20 +79,42 @@ export function ManualPreview({ markdown }: ManualPreviewProps) {
         );
     };
 
+    // Split markdown by horizontal rules to get individual steps
+    const steps = markdown.split('---\n\n').filter(step => step.trim());
+
     return (
         <div className="w-full max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden border print:shadow-none print:border-none">
-            <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center print:hidden">
-                <h2 className="font-semibold text-gray-700">Generated Manual</h2>
-            </div>
             <div className="p-8 prose max-w-none">
-                <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                        img: ImageRenderer
-                    }}
-                >
-                    {markdown}
-                </ReactMarkdown>
+                {steps.map((stepContent, index) => (
+                    <div key={index} className="mb-10 pb-10 border-b last:border-b-0">
+                        <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                                img: ImageRenderer,
+                                // Fix hydration error: use div for paragraphs containing images
+                                p: ({ node, children }) => {
+                                    const hasImage = (node?.children as any[])?.some(
+                                        (child: any) => child.tagName === 'img'
+                                    );
+
+                                    if (hasImage) {
+                                        return <div className="my-4">{children}</div>;
+                                    }
+                                    return <p>{children}</p>;
+                                }
+                            }}
+                        >
+                            {stepContent}
+                        </ReactMarkdown>
+
+                        {/* Comment Section (not allowed inside prose directly without styling reset) */}
+                        {showComments && (
+                            <div className="not-prose mt-8">
+                                <CommentSection manualId={manualId} stepIndex={index} readOnly={readOnly} />
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
         </div>
     );

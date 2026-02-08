@@ -3,13 +3,10 @@ import { notFound } from "next/navigation";
 import { ManualPreview } from "@/components/features/manual/ManualPreview";
 
 function generateMarkdown(manual: any): string {
-    let md = `# ${manual.title}\n\n`;
+    let md = '';
 
     manual.steps.forEach((step: any, index: number) => {
         md += `## Step ${index + 1}: ${step.title}\n`;
-        if (step.timestamp) {
-            md += `**Timestamp:** ${step.timestamp}\n\n`;
-        }
         md += `${step.description}\n\n`;
 
         if (step.image_url) {
@@ -48,8 +45,6 @@ function generateMarkdown(manual: any): string {
     return md;
 }
 
-// Next.js 15+ or recent versions might require params to be awaited or handled differently in some contexts,
-// but for standard dynamic routes:
 export default async function SharePage(props: { params: Promise<{ id: string }> }) {
     const params = await props.params;
     const manual = await getPublicManual(params.id);
@@ -75,7 +70,7 @@ export default async function SharePage(props: { params: Promise<{ id: string }>
                     </div>
                 </header>
 
-                <ManualPreview markdown={markdown} />
+                <ManualPreview markdown={markdown} manualId={params.id} />
             </div>
         </div>
     );

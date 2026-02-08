@@ -57,6 +57,14 @@ class FirestoreRepository:
         doc_ref = self.db.collection(collection_name).document(document_id)
         doc_ref.update(data)
 
+    # ドキュメントの設定（作成または上書き）
+    def set_document(self, collection_name: str, document_id: str, data: Dict[str, Any]) -> None:
+        """
+        ドキュメントを作成または上書き
+        """
+        doc_ref = self.db.collection(collection_name).document(document_id)
+        doc_ref.set(data)
+
 
     # ドキュメントの削除
     def delete_document(self, collection_name: str, document_id: str) -> None:
@@ -73,4 +81,35 @@ class FirestoreRepository:
         """
         docs = self.db.collection_group(collection_group_id).where(field, operator, value).stream()
         return [{"id": doc.id, "path": doc.reference.path, **doc.to_dict()} for doc in docs]
+
+    # サブコレクション操作
+    def add_to_subcollection(self, parent_path: str, subcollection_name: str, data: Dict[str, Any], document_id: Optional[str] = None) -> str:
+        """
+        サブコレクションに新しいドキュメントを追加
+        parent_path: 親ドキュメントのパス (例: "comments/manual_id/steps/0")
+        subcollection_name: サブコレクション名 (例: "comments")
+        returns: 作成されたドキュメントのID
+        """
+        if document_id:
+            doc_ref = self.db.document(parent_path).collection(subcollection_name).document(document_id)
+            doc_ref.set(data)
+            return document_id
+        else:
+            doc_ref = self.db.document(parent_path).collection(subcollection_name).document()
+            doc_ref.set(data)
+            return doc_ref.id
+
+    def get_subcollection(self, parent_path: str, subcollection_name: str, order_by: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        サブコレクションの全ドキュメントを取得
+        parent_path: 親ドキュメントのパス
+        subcollection_name: サブコレクション名
+        order_by: ソートフィールド (オプション)
+        returns: ドキュメントのリスト
+        """
+        query = self.db.document(parent_path).collection(subcollection_name)
+        if order_by:
+            query = query.order_by(order_by)
+        docs = query.stream()
+        return [{"id": doc.id, **doc.to_dict()} for doc in docs]
 
