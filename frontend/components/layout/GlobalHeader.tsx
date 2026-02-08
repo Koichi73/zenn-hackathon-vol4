@@ -51,16 +51,19 @@ export function GlobalHeader() {
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="relative h-9 w-9 rounded-full">
-                                    <Avatar className="h-9 w-9">
-                                        <AvatarImage src={user.photoURL || "/placeholder-user.jpg"} alt={user.displayName || "User"} />
-                                        <AvatarFallback className="bg-primary text-primary-foreground">
-                                            {user.displayName ? user.displayName[0].toUpperCase() : <User className="h-4 w-4" />}
+                                    <Avatar className="h-9 w-9 border border-blue-600">
+                                        <AvatarFallback className="bg-white">
+                                            <User className="h-4 w-4 text-blue-600" />
                                         </AvatarFallback>
                                     </Avatar>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                                <DropdownMenuLabel className="font-normal">
+                                    <div className="flex flex-col space-y-1">
+                                        <p className="text-sm font-medium leading-none">{user.email}</p>
+                                    </div>
+                                </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={handleLogout}>
                                     Log out
