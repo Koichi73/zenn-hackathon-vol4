@@ -3,12 +3,16 @@ from google.genai import types
 import os
 from pathlib import Path
 import asyncio
+import tempfile
+import shutil
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from dotenv import load_dotenv
 from app.services.prompts import VIDEO_ANALYSIS_PROMPT, IMAGE_ANALYSIS_PROMPT
 import time
 import logging
+import uuid
+from app.repositories.gcs_repository import GCSRepository
 
 load_dotenv()
 
@@ -74,28 +78,30 @@ class GeminiService:
         self.model_name = os.getenv("MODEL_NAME", "gemini-3-flash-preview")
         self.temperature = 1.0 if self.model_name == "gemini-3-flash-preview" else 0.0
 
-    async def generate_manual_from_video(self, user_id: str, video_path: str, video_service, manual_id: str, manual_service, gcs_video_uri: Optional[str] = None) -> List[ManualStep]:
+    async def generate_manual_from_video(self, user_id: str, video_service, manual_id: str, manual_service, gcs_video_uri: str) -> List[ManualStep]:
         """
         Main pipeline with Incremental Firestore Updates:
-            1. Analyze video structure -> Update Firestore (Phase 1)
-            2. Extract images
-            3. Analyze images -> Update Firestore per step (Phase 3)
+            1. Analyze video structure (Phase 1)
+            2. Download Video (for Phase 2)
+            3. Extract images (Phase 2)
+            4. Analyze images (Phase 3)
         """
-        print(f"Starting analysis for: {gcs_video_uri if gcs_video_uri else video_path}")
+        if not gcs_video_uri:
+            raise ValueError("gcs_video_uri is required for video analysis")
+            
+        print(f"Starting analysis for: {gcs_video_uri}")
 
         # Phase 1: Video Structure
         print("Phase 1: Analyzing video structure...")
-        structures = await self.analyze_video_structure(gcs_video_uri if gcs_video_uri else video_path)
+        structures = await self.analyze_video_structure(gcs_video_uri)
         if not structures:
             print("Phase 1 failed: No structure found.")
-            # エラー状態更新などが必要だが、一旦終了
             manual_service.update_manual_status(user_id, manual_id, "error")
             return []
         
         print(f"Phase 1 complete. Found {len(structures)} steps.")
 
         # [Firestore Update] 骨組み保存
-        # ManualStepの形に変換 (image_urlなどはNone)
         current_steps = []
         for s in structures:
             current_steps.append({
@@ -109,118 +115,101 @@ class GeminiService:
         
         manual_service.init_manual_steps(user_id, manual_id, current_steps)
 
-        # Phase 2: Image Extraction
-        manual_service.update_manual_status(user_id, manual_id, "extracting_images")
-        
-        steps_for_extraction = [s.model_dump() for s in structures]
-        print("Phase 2: Extracting images...")
-        
-        # 注意: GCSの動画パスを渡す必要があるが、video_serviceはローカルファイルを期待している。
-        # 現在のvideo_pathはローカルの一時ファイルパスのはずなのでOK。
-        steps_with_images = await video_service.extract_frames(video_path, steps_for_extraction)
-        
-        # Verify images were extracted
-        valid_steps = [s for s in steps_with_images if s.get("image_url")]
-        
-        if not valid_steps:
-             print("Phase 2 failed: No images extracted.")
-             manual_service.update_manual_status(user_id, manual_id, "error")
-             return []
-
-        print(f"Phase 2 complete. Extracted {len(valid_steps)} images.")
-        
-        # GCSへの画像アップロードが必要
-        # extract_frames は /static/... を返すが、これをGCSに上げてURL更新する必要がある。
-        # ManualService.save_manual のロジックの一部を再利用したいが、
-        # ここでは簡易的に「ここでアップロード」してしまう。
-        # または、今回はFrontendから直接GCS参照できない（Privateバケットなら）が、
-        # Publicバケット前提か、もしくは「詳細解析」のループ内で順次アップロード＆更新を行う。
-        
-        # GCS Repository for image upload
-        from app.repositories.gcs_repository import GCSRepository
-        gcs_repo = GCSRepository()
-        
-        # Phase 3: Image Analysis Loop & Incremental Update
-        manual_service.update_manual_status(user_id, manual_id, "analyzing_details")
-        print("Phase 3: Analyzing images sequentially for real-time updates...")
-        
-        final_steps = []
-        # current_steps (スケルトン) をベースに更新していく
-        
-        for i, step_data in enumerate(valid_steps):
-            image_url = step_data.get("image_url")
-            title = step_data.get("title")
-            timestamp = step_data.get("timestamp")
-
-            # 1. 画像アップロード (Local -> GCS)
-            # ローカルパス解決
-            local_file_path = self.resolve_image_path(image_url)
-            public_image_url = image_url 
-            
+        # Temporary directory for video and images
+        with tempfile.TemporaryDirectory() as temp_dir:
+            video_local_path = None
             try:
-                if os.path.exists(local_file_path):
+                # GCS Repository instance
+                gcs_repo = GCSRepository()
+
+                # Phase 2 Preparation: Download Video
+                print(f"Downloading video for frame extraction: {gcs_video_uri}")
+                
+                # Determine temp filename
+                ext = os.path.splitext(gcs_video_uri)[1] or ".mp4"
+                temp_filename = f"{uuid.uuid4()}{ext}"
+                video_local_path = os.path.join(temp_dir, temp_filename)
+                
+                gcs_repo.download_file_from_uri(gcs_video_uri, video_local_path)
+                
+                # Phase 2: Image Extraction
+                manual_service.update_manual_status(user_id, manual_id, "extracting_images")
+                
+                steps_for_extraction = [s.model_dump() for s in structures]
+                print("Phase 2: Extracting images...")
+                
+                # Extract frames to the temp directory
+                steps_with_images = await video_service.extract_frames(video_local_path, steps_for_extraction, temp_dir)
+                
+                # Verify images were extracted
+                valid_steps = [s for s in steps_with_images if s.get("image_path")]
+                
+                if not valid_steps:
+                     print("Phase 2 failed: No images extracted.")
+                     manual_service.update_manual_status(user_id, manual_id, "error")
+                     return []
+        
+                print(f"Phase 2 complete. Extracted {len(valid_steps)} images.")
+                
+                # Phase 3: Image Analysis Loop & Incremental Update
+                manual_service.update_manual_status(user_id, manual_id, "analyzing_details")
+                print("Phase 3: Analyzing images sequentially for real-time updates...")
+                
+                for i, step_data in enumerate(valid_steps):
+                    local_file_path = step_data.get("image_path")
+                    title = step_data.get("title")
+                    timestamp = step_data.get("timestamp")
+        
+                    # 1. 画像アップロード (Temp -> GCS)
                     filename = os.path.basename(local_file_path)
-                    # manuals/{id}/images/step_X.jpg
                     gcs_dest_path = f"manuals/{manual_id}/images/{filename}"
                     
-                    public_image_url = await asyncio.to_thread(
-                        gcs_repo.upload_file,
-                        local_file_path,
-                        gcs_dest_path
-                    )
-                    print(f"Uploaded image to: {public_image_url}")
-            except Exception as e:
-                print(f"Image upload failed for step {i}: {e}")
-
-            # 2. 詳細解析
-            analyzed_step = await self.analyze_single_image(local_file_path, title, timestamp, public_image_url)
-            
-            if analyzed_step:
-                # 3. リスト更新
-                step_dict = analyzed_step.model_dump()
-                
-                # uploadによりURLが変わったので反映
-                step_dict["image_url"] = public_image_url
-                
-                # 既存のリストを置換
-                if i < len(current_steps):
-                    current_steps[i] = step_dict
-                else:
-                    current_steps.append(step_dict)
-                
-                # [Firestore Update] 1ステップごとに更新
-                manual_service.update_manual_steps(user_id, manual_id, current_steps)
-
-            # 4. Cleanup local image
-            if local_file_path and os.path.exists(local_file_path):
-                try:
-                    os.remove(local_file_path)
-                    print(f"Deleted local image: {local_file_path}")
-                except Exception as del_err:
-                    print(f"Failed to delete local image {local_file_path}: {del_err}")
+                    try:
+                        public_image_url = await asyncio.to_thread(
+                            gcs_repo.upload_file,
+                            local_file_path,
+                            gcs_dest_path
+                        )
+                        print(f"Uploaded image to: {public_image_url}")
+                        
+                        # Gemini解析用に gs:// から始まるURIを作成
+                        gcs_image_uri = gcs_repo.get_gcs_uri(gcs_dest_path)
+                        
+                    except Exception as e:
+                        print(f"Image upload failed for step {i}: {e}")
+                        continue
         
-        print("Phase 3 complete.")
-        manual_service.complete_manual_job(user_id, manual_id, current_steps)
-        return [ManualStep(**s) for s in current_steps]
+                    # 2. 詳細解析
+                    analyzed_step = await self.analyze_single_image(gcs_image_uri, title, timestamp, public_image_url)
+                    
+                    if analyzed_step:
+                        # 3. リスト更新
+                        step_dict = analyzed_step.model_dump()
+                        current_steps[i] = step_dict
+                        
+                        # [Firestore Update] 1ステップごとに更新
+                        manual_service.update_manual_steps(user_id, manual_id, current_steps)
+        
+                print("Phase 3 complete.")
+                manual_service.complete_manual_job(user_id, manual_id, current_steps)
+                return [ManualStep(**s) for s in current_steps]
 
+            except Exception as e:
+                print(f"Error in generate_manual_from_video: {e}")
+                manual_service.update_manual_status(user_id, manual_id, "error")
+                return []
+        
     async def analyze_video_structure(self, video_path: str) -> List[StepStructure]:
         """
         Phase 1: Video to Structure (Timestamps & Titles)
-        Supports local file path or GCS URI (gs://...)
         """
-        if video_path.startswith("gs://"):
-             video_part = types.Part.from_uri(
-                file_uri=video_path,
-                mime_type="video/mp4"
-            )
-        else:
-            with open(video_path, "rb") as f:
-                video_data = f.read()
-                
-            video_part = types.Part.from_bytes(
-                data=video_data,
-                mime_type="video/mp4"
-            )
+        if not video_path.startswith("gs://"):
+            raise ValueError(f"video_path must start with gs://. Got: {video_path}")
+
+        video_part = types.Part.from_uri(
+            file_uri=video_path,
+            mime_type="video/mp4"
+        )
 
         prompt = VIDEO_ANALYSIS_PROMPT
         
@@ -249,44 +238,17 @@ class GeminiService:
             print(f"Error in Phase 1: {e}")
             return []
 
-    async def _analyze_images_parallel(self, steps_with_images: List[dict]) -> List[ManualStep]:
-        """
-        Phase 3: Parallel Image Analysis
-        """
-        tasks = []
-        for step in steps_with_images:
-            image_url = step.get("image_url")
-            title = step.get("title")
-            timestamp = step.get("timestamp")
-            
-
-            # Helper to resolve path
-            file_path = self.resolve_image_path(image_url)
-            
-            tasks.append(self.analyze_single_image(file_path, title, timestamp, image_url))
-
-        results = await asyncio.gather(*tasks)
-        # Filter out Nones
-        return [r for r in results if r is not None]
-
-    async def analyze_single_image(self, file_path: str, title: str, timestamp: str, image_url: str) -> Optional[ManualStep]:
+    async def analyze_single_image(self, image_uri: str, title: str, timestamp: str, image_url: str) -> Optional[ManualStep]:
         try:
-            if not os.path.exists(file_path):
-                 print(f"Image not found: {file_path}")
-                 return None
-
-            with open(file_path, "rb") as f:
-                image_data = f.read()
-
-            image_part = types.Part.from_bytes(
-                data=image_data,
+            image_part = types.Part.from_uri(
+                file_uri=image_uri,
                 mime_type="image/jpeg"
             )
 
             prompt = IMAGE_ANALYSIS_PROMPT.format(title=title)
             
             start_time = time.time()
-            logger.info(f"START: analyze_single_image for step '{title}'")
+            logger.info(f"START: analyze_single_image for step '{title}' ({image_uri})")
 
             # Run blocking API call in thread
             response = await asyncio.to_thread(
@@ -329,17 +291,4 @@ class GeminiService:
             print(f"Error in Phase 3 for {title}: {e}")
             return None
     
-    def resolve_image_path(self, image_url: str) -> str:
-        """
-        Resolves the absolute file system path from the image URL.
-        """
-        if not image_url:
-            return ""
-
-        if image_url.startswith("/static/"):
-            app_dir = Path(__file__).resolve().parent.parent
-            relative_path = image_url.lstrip("/")
-            return str(app_dir / relative_path)
-        
-        return image_url
 
