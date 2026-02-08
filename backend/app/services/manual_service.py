@@ -202,7 +202,7 @@ class ManualService:
         self.firestore_repository.update_document(collection_path, manual_id, {
             "steps": steps_structure,
             "step_count": len(steps_structure),
-            "status": "extracting_images", # 次のステータスへ
+            "status": "downloading_video", # 次のステータスへ
             "updated_at": firestore.SERVER_TIMESTAMP
         })
 

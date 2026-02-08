@@ -6,7 +6,7 @@ class VideoService:
     def __init__(self):
         pass
 
-    async def extract_frames(self, video_path: str, steps: list, output_dir: str = "app/static/images", start_index: int = 0):
+    async def extract_frames(self, video_path: str, steps: list, output_dir: str, start_index: int = 0):
         """
         Extracts frames from the video at the given timestamps.
         
@@ -17,10 +17,10 @@ class VideoService:
             start_index: The starting index for step numbering (default: 0).
             
         Returns:
-            List of steps with an added 'image_url' field.
+            List of steps with an added 'image_path' field (absolute local path).
         """
         
-        # Ensure output directory exists
+        # Ensure output directory exists (caller should ideally handle this, but safe to have)
         os.makedirs(output_dir, exist_ok=True)
         
         updated_steps = []
@@ -62,19 +62,12 @@ class VideoService:
                     stderr=subprocess.PIPE
                 )
                 
-                # Assuming static files are served from /static/images/
-                # We hardcode the URL path to match the mount point in main.py
-                # This assumes output_dir ends in "images" or is the mounted directory.
-                
-                # For MVP, we know endpoints.py passes app/static/images
-                # and main.py mounts app/static to /static.
-                # So the file at app/static/images/foo.jpg is accessible at /static/images/foo.jpg
-                
-                step["image_url"] = f"/static/images/{image_filename}"
+                # Return absolute path so caller can decide what to do (upload to GCS, etc.)
+                step["image_path"] = os.path.abspath(image_path)
                 
             except subprocess.CalledProcessError as e:
                 print(f"Error extracting frame at {timestamp}: {e}")
-                step["image_url"] = None # Indicate failure or use placeholder
+                step["image_path"] = None 
                 
             updated_steps.append(step)
             
