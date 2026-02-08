@@ -247,11 +247,27 @@ export default function DashboardPage() {
                                     {manual.title || "Untitled Manual"}
                                 </h3>
                                 <div className="flex justify-between items-center mt-4">
-                                    <span className={`text-xs px-2 py-1 rounded-full ${manual.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                        manual.status === 'error' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                                        }`}>
-                                        {manual.status || 'Unknown'}
-                                    </span>
+                                    <div className="flex gap-2">
+                                        {/* 解析中/解析失敗 */}
+                                        {manual.status !== 'completed' && (
+                                            <span className={`text-xs px-2 py-1 rounded-full ${manual.status === 'error'
+                                                ? 'bg-red-100 text-red-700'
+                                                : 'bg-yellow-100 text-yellow-700'
+                                                }`}>
+                                                {manual.status === 'error' ? 'Error' : 'Analyzing'}
+                                            </span>
+                                        )}
+
+                                        {/* 公開/非公開 */}
+                                        {manual.status === 'completed' && (
+                                            <span className={`text-xs px-2 py-1 rounded-full ${manual.is_public
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-slate-100 text-slate-600'
+                                                }`}>
+                                                {manual.is_public ? 'Shared' : 'Private'}
+                                            </span>
+                                        )}
+                                    </div>
                                     <span className="text-xs text-muted-foreground">
                                         {manual.created_at ? new Date(manual.created_at).toLocaleDateString() : ''}
                                     </span>
