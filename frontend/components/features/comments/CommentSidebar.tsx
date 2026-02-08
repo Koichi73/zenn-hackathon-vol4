@@ -107,7 +107,7 @@ export function CommentSidebar({ manualId, steps, onStepClick }: CommentSidebarP
     const totalComments = Object.values(commentCounts).reduce((sum, count) => sum + count, 0);
 
     return (
-        <div className={`fixed right-4 top-36 bottom-4 bg-white border rounded-lg shadow-sm overflow-hidden z-20 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-[60px]' : 'w-[320px]'
+        <div className={`fixed right-4 top-36 bg-white border rounded-lg shadow-sm overflow-hidden z-20 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-[60px] h-fit' : 'w-[320px] bottom-4'
             }`}>
             {/* Header */}
             <div className="p-4 border-b bg-white flex items-center justify-between">
