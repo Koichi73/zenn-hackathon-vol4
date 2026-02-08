@@ -22,7 +22,7 @@ export function CommentSidebar({ manualId, steps, onStepClick }: CommentSidebarP
     const [selectedStep, setSelectedStep] = useState<number | null>(null);
     const [stepComments, setStepComments] = useState<Comment[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(true);
 
     // Load comment counts for all steps
     useEffect(() => {
@@ -150,8 +150,8 @@ export function CommentSidebar({ manualId, steps, onStepClick }: CommentSidebarP
                                     <button
                                         onClick={() => handleStepClick(index)}
                                         className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${isSelected
-                                                ? 'bg-blue-50 text-blue-900'
-                                                : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
+                                            ? 'bg-blue-50 text-blue-900'
+                                            : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
                                             }`}
                                     >
                                         {isSelected ? (
