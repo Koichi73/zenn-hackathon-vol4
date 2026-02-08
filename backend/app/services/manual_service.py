@@ -83,7 +83,8 @@ class ManualService:
             "thumbnail_url": thumbnail_url,
             "step_count": len(steps),
             "status": "completed",
-            "updated_at": firestore.SERVER_TIMESTAMP
+            "updated_at": firestore.SERVER_TIMESTAMP,
+            "steps": steps
             # is_public は変更しない
         }
 

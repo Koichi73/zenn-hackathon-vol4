@@ -46,6 +46,7 @@ class GCSRepository:
         returns: アップロードしたファイルの公開URL
         """
         blob = self.bucket.blob(destination_blob_name)
+        blob.cache_control = "no-cache, no-store, max-age=0"  # Prevent caching
         blob.upload_from_string(content, content_type=content_type)
         try:
             blob.make_public()
