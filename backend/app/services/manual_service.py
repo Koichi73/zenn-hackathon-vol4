@@ -52,35 +52,37 @@ class ManualService:
 
     # --- 保存・更新系 ---
 
+    def _upload_json_to_gcs(self, manual_id: str, steps: List[Dict]) -> str:
+        """
+        手順情報をJSONとしてGCSにアップロードし、パスを返す
+        """
+        json_content = json.dumps(steps, ensure_ascii=False, indent=2)
+        json_path = f"manuals/{manual_id}/manual.json"
+
+        self.gcs_repository.upload_structure_content(
+            json_content, 
+            json_path, 
+            "application/json"
+        )
+        return json_path
+
     async def save_manual(self, user_id: str, steps: List[Dict], manual_id: str, title: str = None) -> Dict[str, Any]:
         """
         手順書JSONをGCSにアップロードし、Firestoreにメタデータを保存する
         """
         # 1. 手順情報をJSONとしてアップロード
-        json_content = json.dumps(steps, ensure_ascii=False, indent=2)
-        json_path = f"manuals/{manual_id}/manual.json"
-
-        await asyncio.to_thread(
-            self.gcs_repository.upload_structure_content, 
-            json_content, 
-            json_path, 
-            "application/json"
+        json_path = await asyncio.to_thread(
+            self._upload_json_to_gcs,
+            manual_id,
+            steps
         )
 
         # 2. Firestore にメタデータを保存
-        # Extract thumbnail from first step
-        thumbnail_url = None
-        if steps and len(steps) > 0:
-            first_step_image = steps[0].get("image_url")
-            if first_step_image and first_step_image.startswith("http"):
-                thumbnail_url = first_step_image
-        
         metadata = {
             "id": manual_id,
             "title": title or manual_id,
             "manual_id": manual_id,
             "gcs_json_path": json_path,
-            "thumbnail_url": thumbnail_url,
             "step_count": len(steps),
             "status": "completed",
             "updated_at": firestore.SERVER_TIMESTAMP,
@@ -89,7 +91,6 @@ class ManualService:
         }
 
         try:
-            # ログインユーザーのID
             collection_path = f"users/{user_id}/manuals"
             
             await asyncio.to_thread(
@@ -162,38 +163,14 @@ class ManualService:
             "updated_at": firestore.SERVER_TIMESTAMP
         })
 
-    def update_step_detail(self, manual_id: str, step_index: int, step_data: Dict):
-        """
-        Phase 3進行中: 特定のステップの詳細（画像・説明）を更新
-        Firestoreは配列の特定インデックス更新が苦手なので、
-        一度読み込んで更新するロック処理が必要だが、
-        今回は簡易的に Transaction なしで実装する（競合頻度が低いため）。
-        または、配列全体を持ち回る設計にする。
-        
-        ここでは、「GeminiService」が全ステップ配列を持っているので、
-        それを丸ごと更新する形が一番安全で簡単。
-        
-        しかし、頻繁な書き込みになるため、最適化検討。
-        一旦、Client側で「配列全体置換」を受け入れる設計にする。
-        """
-        pass # 下記 update_all_steps を使う
-
     def update_manual_steps(self, user_id: str, manual_id: str, all_steps: List[Dict], status: str = None):
         """
         ステップ配列全体を更新する（進捗反映用）
         """
         collection_path = f"users/{user_id}/manuals"
         
-        # Extract thumbnail from first step
-        thumbnail_url = None
-        if all_steps and len(all_steps) > 0:
-            first_step_image = all_steps[0].get("image_url")
-            if first_step_image and first_step_image.startswith("http"):
-                thumbnail_url = first_step_image
-        
         data = {
             "steps": all_steps,
-            "thumbnail_url": thumbnail_url,
             "updated_at": firestore.SERVER_TIMESTAMP
         }
         if status:
@@ -201,25 +178,40 @@ class ManualService:
 
         self.firestore_repository.update_document(collection_path, manual_id, data)
 
-    def complete_manual_job(self, user_id: str, manual_id: str, final_steps: List[Dict]):
+    async def complete_manual_job(self, user_id: str, manual_id: str, final_steps: List[Dict]):
         """
         全工程完了
         """
-        collection_path = f"users/{user_id}/manuals"
+        # 1. JSON生成 & アップロード
+        json_path = None
+        try:
+             json_path = await asyncio.to_thread(
+                self._upload_json_to_gcs,
+                manual_id,
+                final_steps
+            )
+        except Exception as e:
+            print(f"Error uploading JSON in complete_manual_job: {e}")
         
-        # Extract thumbnail from first step
+        # 2. サムネイル画像の抽出
         thumbnail_url = None
         if final_steps and len(final_steps) > 0:
             first_step_image = final_steps[0].get("image_url")
             if first_step_image and first_step_image.startswith("http"):
                 thumbnail_url = first_step_image
         
-        self.firestore_repository.update_document(collection_path, manual_id, {
+        # 3. Firestore更新
+        collection_path = f"users/{user_id}/manuals"
+        
+        update_data = {
             "steps": final_steps,
             "thumbnail_url": thumbnail_url,
             "status": "completed",
-            "updated_at": firestore.SERVER_TIMESTAMP
-        })
+            "updated_at": firestore.SERVER_TIMESTAMP,
+            "gcs_json_path": json_path
+        }
+
+        self.firestore_repository.update_document(collection_path, manual_id, update_data)
 
     def update_visibility(self, user_id: str, manual_id: str, is_public: bool) -> bool:
         """

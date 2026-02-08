@@ -72,18 +72,21 @@ export function EditorView() {
             return;
         }
 
-        // Always save before sharing to ensure GCS JSON exists and is up-to-date
-        setIsSaving(true);
-        try {
-            await saveManual(manualId, title || filename, steps);
-            setSaveStatus('success');
-            setIsDirty(false);
+        if (isDirty) {
+            setIsSaving(true);
+            try {
+                await saveManual(manualId, title || filename, steps);
+                setSaveStatus('success');
+                setIsDirty(false);
+                setIsShareDialogOpen(true);
+            } catch (error) {
+                console.error("Save error:", error);
+                alert("保存に失敗しました。共有できません。");
+            } finally {
+                setIsSaving(false);
+            }
+        } else {
             setIsShareDialogOpen(true);
-        } catch (error) {
-            console.error("Save error:", error);
-            alert("保存に失敗しました。共有できません。");
-        } finally {
-            setIsSaving(false);
         }
     };
 
