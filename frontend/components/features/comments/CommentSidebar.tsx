@@ -147,7 +147,7 @@ export function CommentSidebar({ manualId, steps, onStepClick }: CommentSidebarP
                 >
                     {isCollapsed ? (
                         totalComments > 0 ? (
-                            <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-xs font-bold shadow-sm">
+                            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold shadow-sm">
                                 {totalComments}
                             </div>
                         ) : (
