@@ -246,28 +246,34 @@ export default function DashboardPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         {SAMPLES.map((sample) => (
-                                            <div key={sample.id} className="relative group">
-                                                <button
-                                                    onClick={() => handleSampleSelect(sample)}
-                                                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
-                                                >
-                                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-                                                        <Video className="h-5 w-5" />
+                                            <div key={sample.id} className="rounded-xl border border-border bg-card p-4 space-y-3">
+                                                {/* Video Title */}
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                                        <Video className="h-4 w-4" />
                                                     </div>
-                                                    <p className="text-sm font-semibold text-foreground leading-none">
+                                                    <p className="text-sm font-semibold text-foreground">
                                                         {sample.title}
                                                     </p>
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setPreviewVideo(sample.path);
-                                                    }}
-                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                                                    title="Preview video"
-                                                >
-                                                    <Play className="h-4 w-4 fill-current" />
-                                                </button>
+                                                </div>
+
+                                                {/* Action Buttons */}
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button
+                                                        onClick={() => setPreviewVideo(sample.path)}
+                                                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-background hover:bg-muted transition-colors text-xs font-medium"
+                                                    >
+                                                        <Play className="h-3.5 w-3.5" />
+                                                        Play
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleSampleSelect(sample)}
+                                                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs font-medium"
+                                                    >
+                                                        <Upload className="h-3.5 w-3.5" />
+                                                        Upload
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
