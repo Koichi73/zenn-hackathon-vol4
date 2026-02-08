@@ -147,6 +147,17 @@ class CommentService:
         未読コメント数を取得
         """
         try:
+            unread_counts = await self.get_unread_counts_by_step(user_id, manual_id)
+            return sum(unread_counts.values())
+        except Exception as e:
+            print(f"Error getting unread count: {e}")
+            return 0
+
+    async def get_unread_counts_by_step(self, user_id: str, manual_id: str) -> Dict[int, int]:
+        """
+        ステップごとの未読コメント数を取得
+        """
+        try:
             # 1. 既読状態を取得
             doc_data = await asyncio.to_thread(
                 self.firestore_repository.get_document, "comment_read_status", user_id
@@ -156,34 +167,25 @@ class CommentService:
             if doc_data and "manuals" in doc_data and manual_id in doc_data["manuals"]:
                 last_read_at = doc_data["manuals"][manual_id].get("last_read_at")
             
-            # 2. マニュアルメタデータを取得 (最後のアクティビティ確認)
-            try:
-                manual_doc = await asyncio.to_thread(
-                    self.firestore_repository.get_document, f"users/{user_id}/manuals", manual_id
-                )
-                if manual_doc:
-                    last_comment_at = manual_doc.get("last_comment_at")
-                    if last_read_at and last_comment_at and last_read_at >= last_comment_at:
-                        return 0
-            except Exception as e:
-                pass
-
-            # 3. 全コメントをフェッチして精査
+            # 2. 全コメントをフェッチして精査
             all_comments = await self.get_all_comments(manual_id)
             
-            unread_count = 0
-            for comments in all_comments.values():
+            unread_counts = {}
+            for step_idx, comments in all_comments.items():
+                count = 0
                 for comment in comments:
                     created_at = comment.get("created_at")
                     if last_read_at is None:
-                        unread_count += 1
+                        count += 1
                     elif created_at and created_at > last_read_at:
-                        unread_count += 1
+                        count += 1
+                if count > 0:
+                    unread_counts[int(step_idx)] = count
             
-            return unread_count
+            return unread_counts
         except Exception as e:
-            print(f"Error getting unread count: {e}")
-            return 0
+            print(f"Error getting unread counts: {e}")
+            return {}
 
     async def get_all_unread_counts(self, user_id: str, manual_ids: List[str]) -> Dict[str, int]:
         """
