@@ -61,22 +61,7 @@ async def toggle_manual_publish(
         
     return {"status": "success", "is_public": request.is_public}
 
-class TitleUpdateRequest(BaseModel):
-    title: str
 
-@router.put("/manuals/{manual_id}/title")
-async def update_manual_title(
-    manual_id: str,
-    request: TitleUpdateRequest,
-    user_id: str = Depends(get_current_user)
-):
-    service = ManualService()
-    success = service.update_manual_title(user_id, manual_id, request.title)
-    
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to update title")
-        
-    return {"status": "success", "title": request.title}
 
 @router.get("/manuals")
 async def list_user_manuals(user_id: str = Depends(get_current_user)):

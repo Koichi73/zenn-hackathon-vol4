@@ -240,20 +240,6 @@ class ManualService:
             print(f"Error updating visibility: {e}")
             return False
 
-    def update_manual_title(self, user_id: str, manual_id: str, title: str) -> bool:
-        """
-        マニュアルのタイトルのみを更新する
-        """
-        try:
-            collection_path = f"users/{user_id}/manuals"
-            self.firestore_repository.update_document(collection_path, manual_id, {
-                "title": title,
-                "updated_at": firestore.SERVER_TIMESTAMP
-            })
-            return True
-        except Exception as e:
-            print(f"Error updating manual title: {e}")
-            return False
 
     def get_user_manuals(self, user_id: str) -> List[Dict[str, Any]]:
         """

@@ -74,21 +74,3 @@ export async function saveManual(manualId: string, title: string, steps: any[]) 
     return await response.json();
 }
 
-// タイトルの更新
-export async function updateManualTitle(manualId: string, title: string) {
-    const user = auth.currentUser;
-    if (!user) throw new Error("User not authenticated");
-    const token = await user.getIdToken();
-
-    const res = await fetch(`${API_BASE_URL}/manuals/${manualId}/title`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ title }),
-    });
-
-    if (!res.ok) throw new Error('Failed to update title');
-    return res.json();
-}

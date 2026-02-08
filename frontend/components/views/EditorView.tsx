@@ -11,7 +11,7 @@ import { ManualPreview } from "@/components/features/manual/ManualPreview";
 import { ImageMaskEditor } from "@/components/features/editor/ImageMaskEditor";
 import { Input } from '@/components/ui/input';
 import { cn } from "@/lib/utils";
-import { saveManual, updateManualTitle } from "@/api/manual-api";
+import { saveManual } from "@/api/manual-api";
 import { ShareDialog } from "@/components/features/share/ShareDialog";
 import { CommentSidebar } from "@/components/features/comments/CommentSidebar";
 import { markManualAsRead } from "@/api/comment-api";
@@ -268,15 +268,6 @@ export function EditorView() {
                                 setTitle(e.target.value);
                                 setIsDirty(true);
                                 setSaveStatus('idle');
-                            }}
-                            onBlur={async () => {
-                                if (manualId && title) {
-                                    try {
-                                        await updateManualTitle(manualId, title);
-                                    } catch (e) {
-                                        console.error("Failed to update title", e);
-                                    }
-                                }
                             }}
                             className="text-center font-bold text-lg h-9 border-transparent hover:border-input focus:border-input bg-transparent px-2 shadow-none w-full pointer-events-auto"
                             placeholder={filename}
