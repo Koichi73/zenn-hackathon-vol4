@@ -18,7 +18,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 export function GlobalHeader() {
-    const { user, isDemoMode } = useAuth();
+    const { user, loading, isDemoMode } = useAuth();
     const router = useRouter();
 
     const handleLogout = async () => {
@@ -47,7 +47,9 @@ export function GlobalHeader() {
 
                 {/* Right: User Profile Avatar */}
                 <div className="flex items-center gap-4">
-                    {user ? (
+                    {loading ? (
+                        <div className="h-9 w-9 rounded-full bg-slate-100 animate-pulse" />
+                    ) : user ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="relative h-9 w-9 rounded-full">
