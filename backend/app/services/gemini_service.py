@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 from app.services.prompts import VIDEO_ANALYSIS_PROMPT, IMAGE_ANALYSIS_PROMPT
 import time
 import logging
+import uuid
+from app.repositories.gcs_repository import GCSRepository
 
 load_dotenv()
 
@@ -117,9 +119,18 @@ class GeminiService:
         with tempfile.TemporaryDirectory() as temp_dir:
             video_local_path = None
             try:
+                # GCS Repository instance
+                gcs_repo = GCSRepository()
+
                 # Phase 2 Preparation: Download Video
                 print(f"Downloading video for frame extraction: {gcs_video_uri}")
-                video_local_path = self._download_video_from_gcs(gcs_video_uri, temp_dir)
+                
+                # Determine temp filename
+                ext = os.path.splitext(gcs_video_uri)[1] or ".mp4"
+                temp_filename = f"{uuid.uuid4()}{ext}"
+                video_local_path = os.path.join(temp_dir, temp_filename)
+                
+                gcs_repo.download_file_from_uri(gcs_video_uri, video_local_path)
                 
                 # Phase 2: Image Extraction
                 manual_service.update_manual_status(user_id, manual_id, "extracting_images")
@@ -140,15 +151,9 @@ class GeminiService:
         
                 print(f"Phase 2 complete. Extracted {len(valid_steps)} images.")
                 
-                # GCS Repository for image upload
-                from app.repositories.gcs_repository import GCSRepository
-                gcs_repo = GCSRepository()
-                
                 # Phase 3: Image Analysis Loop & Incremental Update
                 manual_service.update_manual_status(user_id, manual_id, "analyzing_details")
                 print("Phase 3: Analyzing images sequentially for real-time updates...")
-                
-                bucket_name = os.getenv("BUCKET_NAME")
                 
                 for i, step_data in enumerate(valid_steps):
                     local_file_path = step_data.get("image_path")
@@ -168,7 +173,7 @@ class GeminiService:
                         print(f"Uploaded image to: {public_image_url}")
                         
                         # Gemini解析用に gs:// から始まるURIを作成
-                        gcs_image_uri = f"gs://{bucket_name}/{gcs_dest_path}"
+                        gcs_image_uri = gcs_repo.get_gcs_uri(gcs_dest_path)
                         
                     except Exception as e:
                         print(f"Image upload failed for step {i}: {e}")
@@ -193,26 +198,6 @@ class GeminiService:
                 print(f"Error in generate_manual_from_video: {e}")
                 manual_service.update_manual_status(user_id, manual_id, "error")
                 return []
-
-    def _download_video_from_gcs(self, gcs_uri: str, target_dir: str) -> str:
-        """Downloads video from GCS to a temporary file."""
-        import uuid
-        from app.repositories.gcs_repository import GCSRepository
-        
-        blob_name = gcs_uri
-        parts = gcs_uri.replace("gs://", "").split("/", 1)
-        if len(parts) > 1:
-            blob_name = parts[1]
-
-        ext = os.path.splitext(blob_name)[1] or ".mp4"
-        temp_filename = f"{uuid.uuid4()}{ext}"
-        temp_path = os.path.join(target_dir, temp_filename)
-        
-        print(f"Downloading {blob_name} to {temp_path}")
-        gcs_repo = GCSRepository()
-        gcs_repo.download_file(blob_name, temp_path)
-        
-        return temp_path
         
     async def analyze_video_structure(self, video_path: str) -> List[StepStructure]:
         """
