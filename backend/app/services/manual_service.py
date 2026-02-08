@@ -153,22 +153,6 @@ class ManualService:
             "updated_at": firestore.SERVER_TIMESTAMP
         })
 
-    def update_step_detail(self, manual_id: str, step_index: int, step_data: Dict):
-        """
-        Phase 3進行中: 特定のステップの詳細（画像・説明）を更新
-        Firestoreは配列の特定インデックス更新が苦手なので、
-        一度読み込んで更新するロック処理が必要だが、
-        今回は簡易的に Transaction なしで実装する（競合頻度が低いため）。
-        または、配列全体を持ち回る設計にする。
-        
-        ここでは、「GeminiService」が全ステップ配列を持っているので、
-        それを丸ごと更新する形が一番安全で簡単。
-        
-        しかし、頻繁な書き込みになるため、最適化検討。
-        一旦、Client側で「配列全体置換」を受け入れる設計にする。
-        """
-        pass # 下記 update_all_steps を使う
-
     def update_manual_steps(self, user_id: str, manual_id: str, all_steps: List[Dict], status: str = None):
         """
         ステップ配列全体を更新する（進捗反映用）
