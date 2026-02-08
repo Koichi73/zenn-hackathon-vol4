@@ -15,6 +15,7 @@ interface ShareDialogProps {
 export function ShareDialog({ manualId, isOpen, onOpenChange }: ShareDialogProps) {
     const [isPublic, setIsPublic] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [toggling, setToggling] = useState(false);
     const [copied, setCopied] = useState(false);
 
     const shareUrl = typeof window !== 'undefined'
@@ -25,34 +26,24 @@ export function ShareDialog({ manualId, isOpen, onOpenChange }: ShareDialogProps
         if (isOpen && manualId) {
             setLoading(true);
             getPublicManual(manualId)
-                .then(async (data) => {
-                    if (!data) {
-                        // If not public, automatically publish it
-                        try {
-                            await toggleManualPublish(manualId, true);
-                            setIsPublic(true);
-                        } catch (err) {
-                            console.error("Failed to auto-publish:", err);
-                            setIsPublic(false);
-                        }
-                    } else {
-                        setIsPublic(true);
-                    }
+                .then((data) => {
+                    setIsPublic(!!data);
                 })
                 .catch(() => setIsPublic(false))
                 .finally(() => setLoading(false));
         }
     }, [isOpen, manualId]);
 
-    const handlePublish = async () => {
-        setLoading(true);
+    const handleTogglePublish = async () => {
+        setToggling(true);
         try {
-            await toggleManualPublish(manualId, true);
-            setIsPublic(true);
+            const newState = !isPublic;
+            await toggleManualPublish(manualId, newState);
+            setIsPublic(newState);
         } catch (error) {
-            console.error("Failed to publish manual:", error);
+            console.error("Failed to toggle manual visibility:", error);
         } finally {
-            setLoading(false);
+            setToggling(false);
         }
     };
 
@@ -64,42 +55,83 @@ export function ShareDialog({ manualId, isOpen, onOpenChange }: ShareDialogProps
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-sm p-5 gap-0">
-                <DialogHeader className="mb-4">
-                    <div className="flex items-center gap-2">
-                        {isPublic ? <Globe className="w-4 h-4 text-green-600" /> : <Lock className="w-4 h-4 text-slate-400" />}
-                        <DialogTitle className="text-sm font-semibold">Share Manual</DialogTitle>
+            <DialogContent className="sm:max-w-md p-6">
+                <DialogHeader className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            {isPublic ? (
+                                <Globe className="w-5 h-5 text-green-600" />
+                            ) : (
+                                <Lock className="w-5 h-5 text-slate-400" />
+                            )}
+                            <DialogTitle className="text-lg font-semibold">
+                                {isPublic ? 'Public Manual' : 'Private Manual'}
+                            </DialogTitle>
+                        </div>
                     </div>
                 </DialogHeader>
 
-                <div className="relative">
-                    {loading && !isPublic ? (
-                        <div className="flex items-center justify-center h-10 gap-2 text-slate-400">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="text-xs">Generating Link...</span>
+                <div className="space-y-4 mt-4">
+                    {/* Toggle Switch */}
+                    <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                        <div className="flex items-center gap-3">
+                            {isPublic ? (
+                                <Globe className="w-4 h-4 text-green-600" />
+                            ) : (
+                                <Lock className="w-4 h-4 text-slate-500" />
+                            )}
+                            <div>
+                                <p className="text-sm font-medium">
+                                    {isPublic ? 'Public Access' : 'Private Access'}
+                                </p>
+                            </div>
                         </div>
-                    ) : isPublic ? (
-                        <div className="flex gap-1 animate-in fade-in duration-200">
-                            <Input
-                                value={shareUrl}
-                                readOnly
-                                className="h-10 text-[13px] bg-slate-50 border-slate-200 focus-visible:ring-indigo-600"
-                            />
-                            <Button
-                                size="sm"
+                        <button
+                            onClick={handleTogglePublish}
+                            disabled={loading || toggling}
+                            className={cn(
+                                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                                isPublic ? "bg-green-600" : "bg-slate-300",
+                                (loading || toggling) && "opacity-50 cursor-not-allowed"
+                            )}
+                        >
+                            <span
                                 className={cn(
-                                    "h-10 px-3 transition-colors shrink-0",
-                                    copied ? "bg-green-600 hover:bg-green-700" : "bg-slate-900 hover:bg-black"
+                                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                                    isPublic ? "translate-x-6" : "translate-x-1"
                                 )}
-                                onClick={handleCopy}
-                            >
-                                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                                <span className="ml-1.5 text-xs">{copied ? "Copied" : "Copy"}</span>
-                            </Button>
+                            />
+                        </button>
+                    </div>
+
+                    {/* Share URL Section */}
+                    {loading ? (
+                        <div className="flex items-center justify-center h-20 gap-2 text-slate-400">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span className="text-sm">Loading...</span>
                         </div>
-                    ) : (
-                        <div className="flex items-center justify-center h-10 text-red-500 text-xs">
-                            Failed to generate share link.
+                    ) : isPublic && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Share Link</label>
+                            <div className="flex gap-2">
+                                <Input
+                                    value={shareUrl}
+                                    readOnly
+                                    className="text-sm bg-slate-50 border-slate-200"
+                                />
+                                <Button
+                                    size="sm"
+                                    className={cn(
+                                        "shrink-0 transition-colors",
+                                        copied ? "bg-green-600 hover:bg-green-700" : "bg-slate-900 hover:bg-black"
+                                    )}
+                                    onClick={handleCopy}
+                                >
+                                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                    <span className="ml-2 text-xs">{copied ? "Copied" : "Copy"}</span>
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </div>
