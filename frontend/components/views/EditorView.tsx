@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Download, Cast as MaskIcon, X, ChevronRight, PenTool, Save, Share2, Loader2 } from 'lucide-react';
+import { Download, Cast as MaskIcon, X, ChevronRight, PenTool, Save, Share2, Loader2, Check } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { ManualPreview } from "@/components/features/manual/ManualPreview";
 import { ImageMaskEditor } from "@/components/features/editor/ImageMaskEditor";
 import { Input } from '@/components/ui/input';
 import { cn } from "@/lib/utils";
-import { saveManual, updateManualTitle } from "@/api/manual-api";
+import { saveManual } from "@/api/manual-api";
 import { ShareDialog } from "@/components/features/share/ShareDialog";
 import { CommentSidebar } from "@/components/features/comments/CommentSidebar";
 import { markManualAsRead } from "@/api/comment-api";
@@ -20,8 +20,46 @@ export function EditorView() {
     const { steps, filename, title, setTitle, updateStep, reset, isProcessing, manualId, setManualId } = useVideo();
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
     const [isSaving, setIsSaving] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [isDirty, setIsDirty] = useState(false);
     const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
+    // Prevent closing tab with unsaved changes
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isDirty]);
+
+    const handleSave = async () => {
+        if (!manualId || !steps) return;
+
+        setIsSaving(true);
+        setSaveStatus('idle');
+
+        try {
+            await saveManual(manualId, title || filename, steps);
+            setSaveStatus('success');
+            setIsDirty(false);
+
+            // Reset success status after 2 seconds
+            setTimeout(() => {
+                setSaveStatus('idle');
+            }, 2000);
+        } catch (error) {
+            console.error("Save error:", error);
+            setSaveStatus('error');
+            alert("保存に失敗しました: " + (error instanceof Error ? error.message : "不明なエラー"));
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleShareClick = async () => {
         if (!manualId) {
@@ -34,13 +72,16 @@ export function EditorView() {
             return;
         }
 
+        // Always save before sharing to ensure GCS JSON exists and is up-to-date
         setIsSaving(true);
         try {
             await saveManual(manualId, title || filename, steps);
+            setSaveStatus('success');
+            setIsDirty(false);
             setIsShareDialogOpen(true);
         } catch (error) {
             console.error("Save error:", error);
-            alert("保存に失敗しました: " + (error instanceof Error ? error.message : "不明なエラー"));
+            alert("保存に失敗しました。共有できません。");
         } finally {
             setIsSaving(false);
         }
@@ -54,6 +95,8 @@ export function EditorView() {
         const step = getStep(index);
         if (step) {
             updateStep(index, { ...step, description });
+            setIsDirty(true);
+            setSaveStatus('idle');
         }
     };
 
@@ -87,6 +130,8 @@ export function EditorView() {
             highlight_box: highlight_box,
             mask_boxes: privacyMasks
         });
+        setIsDirty(true);
+        setSaveStatus('idle');
     };
 
     const scrollToStep = (index: number) => {
@@ -219,15 +264,10 @@ export function EditorView() {
                     <div className="w-[300px] flex justify-center px-4 pointer-events-none">
                         <Input
                             value={title || ''}
-                            onChange={(e) => setTitle(e.target.value)}
-                            onBlur={async () => {
-                                if (manualId && title) {
-                                    try {
-                                        await updateManualTitle(manualId, title);
-                                    } catch (e) {
-                                        console.error("Failed to update title", e);
-                                    }
-                                }
+                            onChange={(e) => {
+                                setTitle(e.target.value);
+                                setIsDirty(true);
+                                setSaveStatus('idle');
                             }}
                             className="text-center font-bold text-lg h-9 border-transparent hover:border-input focus:border-input bg-transparent px-2 shadow-none w-full pointer-events-auto"
                             placeholder={filename}
@@ -237,17 +277,42 @@ export function EditorView() {
                     {/* Right: Action Buttons */}
                     <div className="flex-1 flex justify-end items-center gap-2">
                         <Button
+                            variant={isDirty ? "default" : "secondary"}
+                            size="sm"
+                            onClick={handleSave}
+                            disabled={isSaving || (!isDirty && saveStatus !== 'success')}
+                            className={cn(
+                                "transition-all min-w-[100px]",
+                                isDirty ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-md border-indigo-200" : "text-slate-500",
+                                saveStatus === 'success' && "bg-green-600 hover:bg-green-700 text-white"
+                            )}
+                        >
+                            {isSaving ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : saveStatus === 'success' ? (
+                                <>
+                                    <Check className="w-4 h-4 mr-2" />
+                                    Saved!
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4 mr-2" />
+                                    Save
+                                </>
+                            )}
+                        </Button>
+
+                        <Button
                             variant="outline"
                             size="sm"
                             onClick={handleShareClick}
                             disabled={isSaving}
                             className={isSaving ? "opacity-50 cursor-not-allowed" : ""}
                         >
-                            {isSaving ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            ) : (
-                                <Share2 className="w-4 h-4 mr-2" />
-                            )}
+                            <Share2 className="w-4 h-4 mr-2" />
                             Share
                         </Button>
                         <Button

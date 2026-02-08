@@ -52,53 +52,13 @@ class ManualService:
 
     # --- 保存・更新系 ---
 
-    async def save_manual(self, user_id: str, steps: List[Dict], manual_id: str, title: str = None, video_path: str = None) -> Dict[str, Any]:
+    async def save_manual(self, user_id: str, steps: List[Dict], manual_id: str, title: str = None) -> Dict[str, Any]:
         """
-        画像、動画、および手順書JSONをGCSにアップロードし、Firestoreにメタデータを保存する
+        手順書JSONをGCSにアップロードし、Firestoreにメタデータを保存する
         """
-        updated_steps = []
-        full_id = manual_id
-
-        # 1. 各ステップの画像をアップロードしてURLを置換
-        for step in steps:
-            new_step = step.copy()
-            image_url = step.get("image_url")
-
-            if image_url and image_url.startswith("/static/"):
-                # ローカルの相対パスを絶対パスに変換
-                relative_path = image_url.lstrip("/")
-                local_path = str(self.app_dir / relative_path)
-
-                if os.path.exists(local_path):
-                    filename = os.path.basename(local_path)
-                    gcs_dest_path = f"manuals/{full_id}/images/{filename}"
-
-                    # アップロード実行 (非同期実行のためにスレッドへ)
-                    public_url = await asyncio.to_thread(
-                        self.gcs_repository.upload_file,
-                        local_path,
-                        gcs_dest_path
-                    )
-                    new_step["image_url"] = public_url
-            
-            updated_steps.append(new_step)
-
-        # 2. GCSに動画をアップロード
-        gcs_video_path = f"manuals/{full_id}/video.mp4"
-        if video_path and os.path.exists(video_path):
-            try:
-                await asyncio.to_thread(
-                    self.gcs_repository.upload_file,
-                    video_path,
-                    gcs_video_path
-                )
-            except Exception as gcs_err:
-                print(f"GCS Video Upload Error: {gcs_err}")
-                raise gcs_err
-
-        # 3. 手順情報をJSONとしてアップロード
-        json_content = json.dumps(updated_steps, ensure_ascii=False, indent=2)
-        json_path = f"manuals/{full_id}/manual.json"
+        # 1. 手順情報をJSONとしてアップロード
+        json_content = json.dumps(steps, ensure_ascii=False, indent=2)
+        json_path = f"manuals/{manual_id}/manual.json"
 
         await asyncio.to_thread(
             self.gcs_repository.upload_structure_content, 
@@ -107,26 +67,25 @@ class ManualService:
             "application/json"
         )
 
-        # 4. Firestore にメタデータを保存
+        # 2. Firestore にメタデータを保存
         # Extract thumbnail from first step
         thumbnail_url = None
-        if updated_steps and len(updated_steps) > 0:
-            first_step_image = updated_steps[0].get("image_url")
+        if steps and len(steps) > 0:
+            first_step_image = steps[0].get("image_url")
             if first_step_image and first_step_image.startswith("http"):
                 thumbnail_url = first_step_image
         
         metadata = {
-            "id": full_id,
+            "id": manual_id,
             "title": title or manual_id,
             "manual_id": manual_id,
             "gcs_json_path": json_path,
-            "gcs_video_path": gcs_video_path,
             "thumbnail_url": thumbnail_url,
-            "step_count": len(updated_steps),
+            "step_count": len(steps),
             "status": "completed",
-            "is_public": False, # 保存直後は非公開
-            "created_at": firestore.SERVER_TIMESTAMP,
-            "updated_at": firestore.SERVER_TIMESTAMP
+            "updated_at": firestore.SERVER_TIMESTAMP,
+            "steps": steps
+            # is_public は変更しない
         }
 
         try:
@@ -136,22 +95,19 @@ class ManualService:
             await asyncio.to_thread(
                 self.firestore_repository.update_document,
                 collection_path,
-                full_id,
+                manual_id,
                 metadata
             )
         except Exception as e:
             # 失敗時はロールバック（GCS削除）
             await asyncio.to_thread(self.gcs_repository.delete_file, json_path)
-            if video_path:
-                await asyncio.to_thread(self.gcs_repository.delete_file, gcs_video_path)
             print(f"Firestore Error: {e}")
             raise e
 
         return {
-            "id": full_id,
+            "id": manual_id,
             "json_path": json_path,
-            "video_path": gcs_video_path,
-            "image_count": len([s for s in updated_steps if "http" in s.get("image_url", "")])
+            "image_count": len([s for s in steps if "http" in s.get("image_url", "")])
         }
 
     # --- 新しい分析フロー（Firestore段階更新）用 ---
@@ -284,20 +240,6 @@ class ManualService:
             print(f"Error updating visibility: {e}")
             return False
 
-    def update_manual_title(self, user_id: str, manual_id: str, title: str) -> bool:
-        """
-        マニュアルのタイトルのみを更新する
-        """
-        try:
-            collection_path = f"users/{user_id}/manuals"
-            self.firestore_repository.update_document(collection_path, manual_id, {
-                "title": title,
-                "updated_at": firestore.SERVER_TIMESTAMP
-            })
-            return True
-        except Exception as e:
-            print(f"Error updating manual title: {e}")
-            return False
 
     def get_user_manuals(self, user_id: str) -> List[Dict[str, Any]]:
         """

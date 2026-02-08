@@ -2,6 +2,8 @@ import { getPublicManual } from "@/api/manual-api";
 import { notFound } from "next/navigation";
 import { ManualPreview } from "@/components/features/manual/ManualPreview";
 
+export const dynamic = 'force-dynamic';
+
 function generateMarkdown(manual: any): string {
     let md = '';
 
