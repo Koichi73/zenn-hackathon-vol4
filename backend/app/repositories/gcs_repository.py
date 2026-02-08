@@ -60,3 +60,19 @@ class GCSRepository:
         """
         blob = self.bucket.blob(blob_name)
         return blob.download_as_text()
+
+    def get_gcs_uri(self, blob_name: str) -> str:
+        """
+        Gemini APIなどで使用する gs://{bucket_name}/{blob_name} 形式のURIを取得
+        """
+        return f"gs://{self.bucket_name}/{blob_name}"
+
+    def download_file_from_uri(self, gcs_uri: str, destination_file_path: str):
+        """gs://URIからファイルをダウンロードする"""
+        parts = gcs_uri.replace("gs://", "").split("/", 1)
+        if len(parts) < 2:
+            blob_name = gcs_uri
+        else:
+            blob_name = parts[1]
+        
+        self.download_file(blob_name, destination_file_path)
