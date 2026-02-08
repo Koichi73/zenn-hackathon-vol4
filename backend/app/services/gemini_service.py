@@ -191,7 +191,7 @@ class GeminiService:
                         manual_service.update_manual_steps(user_id, manual_id, current_steps)
         
                 print("Phase 3 complete.")
-                manual_service.complete_manual_job(user_id, manual_id, current_steps)
+                await manual_service.complete_manual_job(user_id, manual_id, current_steps)
                 return [ManualStep(**s) for s in current_steps]
 
             except Exception as e:
