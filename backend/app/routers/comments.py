@@ -134,6 +134,29 @@ async def get_unread_count(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/comments/manuals/{manual_id}/unread-counts-by-step")
+async def get_unread_counts_by_step(
+    manual_id: str,
+    x_user_id: Optional[str] = Header(None)
+):
+    """
+    ステップごとの未読コメント数を取得
+    """
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="User ID required")
+    
+    try:
+        service = CommentService()
+        counts = await service.get_unread_counts_by_step(x_user_id, manual_id)
+        return {
+            "manual_id": manual_id,
+            "unread_counts": counts
+        }
+    except Exception as e:
+        print(f"Error getting unread counts by step: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/comments/manuals/unread-counts")
 async def get_all_unread_counts(
     request: UnreadCountsRequest,

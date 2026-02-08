@@ -227,7 +227,7 @@ export default function DashboardPage() {
                             >
                                 {/* Unread Badge */}
                                 {unreadCount > 0 && (
-                                    <div className="absolute top-3 right-3 bg-red-500 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md z-10">
+                                    <div className="absolute top-3 right-3 bg-blue-500 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md z-10">
                                         <MessageCircle className="w-3 h-3" />
                                         <span className="font-medium">{unreadCount}</span>
                                     </div>

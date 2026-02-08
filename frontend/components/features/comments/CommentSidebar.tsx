@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { getComments, Comment } from '@/api/comment-api';
+import { getComments, Comment, getUnreadCount, getUnreadCountsByStep, markManualAsRead } from '@/api/comment-api';
 import { MessageCircle, User, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 
 interface Step {
@@ -22,28 +22,41 @@ export function CommentSidebar({ manualId, steps, onStepClick }: CommentSidebarP
     const [selectedStep, setSelectedStep] = useState<number | null>(null);
     const [stepComments, setStepComments] = useState<Comment[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(true);
 
-    // Load comment counts for all steps
+    // Load unread comment counts for all steps
     useEffect(() => {
-        const loadCommentCounts = async () => {
-            const counts: { [key: number]: number } = {};
-            for (let i = 0; i < steps.length; i++) {
-                try {
-                    const comments = await getComments(manualId, i);
-                    counts[i] = comments.length;
-                } catch (err) {
-                    console.error(`Failed to load comments for step ${i}:`, err);
-                    counts[i] = 0;
-                }
+        const loadUnreadCommentCounts = async () => {
+            try {
+                const counts = await getUnreadCountsByStep(manualId);
+                setCommentCounts(counts);
+            } catch (err) {
+                console.error(`Failed to load unread counts:`, err);
+                setCommentCounts({});
             }
-            setCommentCounts(counts);
         };
 
         if (manualId && steps.length > 0) {
-            loadCommentCounts();
+            loadUnreadCommentCounts();
         }
-    }, [manualId, steps.length]);
+    }, [manualId, steps.length, isCollapsed]);
+
+    // Mark manual as read when sidebar is opened
+    useEffect(() => {
+        if (!isCollapsed && manualId) {
+            const markAsRead = async () => {
+                try {
+                    await markManualAsRead(manualId);
+                    // Refresh counts after marking as read
+                    // However, we might want to keep the unread badges until user refreshes 
+                    // or just clear them. Usually, opening the sidebar marks them "as being read".
+                } catch (err) {
+                    console.error('Failed to mark manual as read:', err);
+                }
+            };
+            markAsRead();
+        }
+    }, [isCollapsed, manualId]);
 
     // Load comments for selected step
     const loadStepComments = async (stepIndex: number) => {
@@ -107,10 +120,10 @@ export function CommentSidebar({ manualId, steps, onStepClick }: CommentSidebarP
     const totalComments = Object.values(commentCounts).reduce((sum, count) => sum + count, 0);
 
     return (
-        <div className={`fixed right-4 top-36 bottom-4 bg-white border rounded-lg shadow-sm overflow-hidden z-20 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-[60px]' : 'w-[320px]'
+        <div className={`fixed right-4 top-36 bg-white border rounded-lg shadow-sm overflow-hidden z-20 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-fit h-fit' : 'w-[320px] bottom-4'
             }`}>
             {/* Header */}
-            <div className="p-4 border-b bg-white flex items-center justify-between">
+            <div className={`bg-white flex items-center ${isCollapsed ? 'p-2 justify-center' : 'p-4 border-b justify-between'}`}>
                 {!isCollapsed && (
                     <div className="flex items-center gap-2">
                         <MessageCircle className="w-4 h-4 text-gray-600" />
@@ -126,11 +139,20 @@ export function CommentSidebar({ manualId, steps, onStepClick }: CommentSidebarP
                 )}
                 <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
-                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    className={`flex items-center justify-center transition-all ${isCollapsed
+                        ? 'w-8 h-8 rounded-full hover:bg-gray-100'
+                        : 'p-1 hover:bg-gray-100 rounded'
+                        }`}
                     title={isCollapsed ? 'Expand' : 'Collapse'}
                 >
                     {isCollapsed ? (
-                        <ChevronLeft className="w-4 h-4 text-gray-600" />
+                        totalComments > 0 ? (
+                            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold shadow-sm">
+                                {totalComments}
+                            </div>
+                        ) : (
+                            <ChevronLeft className="w-5 h-5 text-gray-500" />
+                        )
                     ) : (
                         <ChevronRight className="w-4 h-4 text-gray-600" />
                     )}
@@ -150,8 +172,8 @@ export function CommentSidebar({ manualId, steps, onStepClick }: CommentSidebarP
                                     <button
                                         onClick={() => handleStepClick(index)}
                                         className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${isSelected
-                                                ? 'bg-blue-50 text-blue-900'
-                                                : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
+                                            ? 'bg-blue-50 text-blue-900'
+                                            : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
                                             }`}
                                     >
                                         {isSelected ? (

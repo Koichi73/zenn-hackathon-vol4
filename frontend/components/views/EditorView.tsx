@@ -22,14 +22,6 @@ export function EditorView() {
     const [isSaving, setIsSaving] = useState(false);
     const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
-    // エディターを開いたときに既読マーク
-    useEffect(() => {
-        if (manualId) {
-            markManualAsRead(manualId).catch(err => {
-                console.error('Failed to mark manual as read:', err);
-            });
-        }
-    }, [manualId]);
 
     const handleShareClick = async () => {
         if (!manualId) {

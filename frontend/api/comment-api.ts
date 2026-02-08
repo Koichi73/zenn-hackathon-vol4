@@ -123,6 +123,29 @@ export async function getUnreadCount(manualId: string): Promise<number> {
     return data.unread_count;
 }
 
+// ステップごとの未読コメント数を取得
+export async function getUnreadCountsByStep(manualId: string): Promise<{ [stepIndex: number]: number }> {
+    const user = auth.currentUser;
+    if (!user) {
+        return {};
+    }
+
+    const res = await fetch(`${API_BASE_URL}/comments/manuals/${manualId}/unread-counts-by-step`, {
+        headers: {
+            'X-User-Id': user.uid,
+        },
+        cache: 'no-store',
+    });
+
+    if (!res.ok) {
+        console.error('Failed to fetch unread counts by step');
+        return {};
+    }
+
+    const data = await res.json();
+    return data.unread_counts;
+}
+
 // 全マニュアルの未読コメント数を取得
 export async function getAllUnreadCounts(manualIds: string[]): Promise<{ [manualId: string]: number }> {
     const user = auth.currentUser;
