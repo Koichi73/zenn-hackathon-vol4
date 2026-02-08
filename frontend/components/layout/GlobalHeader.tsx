@@ -18,7 +18,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 export function GlobalHeader() {
-    const { user } = useAuth();
+    const { user, isDemoMode } = useAuth();
     const router = useRouter();
 
     const handleLogout = async () => {
@@ -38,6 +38,11 @@ export function GlobalHeader() {
                         <span className="text-sm font-bold text-primary-foreground">M</span>
                     </div>
                     <span className="text-xl font-semibold text-foreground">Manual AI</span>
+                    {/* {isDemoMode && (
+                        <span className="ml-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200 rounded-full">
+                            Demo Mode
+                        </span>
+                    )} */}
                 </Link>
 
                 {/* Right: User Profile Avatar */}
