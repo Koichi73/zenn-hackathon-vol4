@@ -270,11 +270,11 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                                 y={mask.y}
                                 width={mask.width}
                                 height={mask.height}
-                                fill={mask.type === 'privacy' ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 0, 0, 0.0)"}
+                                fill={mask.type === 'privacy' ? "#000000" : "rgba(255, 0, 0, 0.0)"}
                                 stroke="#ef4444"
-                                strokeWidth={mask.id === selectedId ? 4 / scale : (mask.type === 'highlight' ? 4 / scale : 0)}
+                                strokeWidth={mask.type === 'highlight' ? 4 / scale : 0}
                                 dash={mask.type === 'highlight' ? undefined : undefined}
-                                opacity={mask.type === 'privacy' ? 1 : 1}
+                                opacity={1}
                                 draggable
                                 onClick={() => selectShape(mask.id)}
                                 onTap={() => selectShape(mask.id)}
