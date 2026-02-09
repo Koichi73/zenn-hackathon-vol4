@@ -249,14 +249,14 @@ export function EditorView() {
         <div className="flex flex-col h-[calc(100vh-64px)] print:h-auto print:block">
             {/* Project Toolbar */}
             <div className="border-b bg-white sticky top-0 z-40 print:hidden shadow-sm">
-                <div className="container mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
+                <div className="container mx-auto flex flex-wrap items-center justify-between px-4 sm:px-6 lg:px-8 py-3 gap-y-3">
                     {/* Left: Edit/Preview Segmented Control */}
-                    <div className="flex-1 flex justify-start">
+                    <div className="flex-1 flex justify-start order-1 min-w-[140px]">
                         <div className="inline-flex items-center rounded-lg border bg-muted p-1">
                             <button
                                 onClick={() => setViewMode('edit')}
                                 className={cn(
-                                    "px-6 py-1.5 text-sm font-medium rounded-md transition-colors",
+                                    "px-3 sm:px-6 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors",
                                     viewMode === 'edit'
                                         ? "bg-background text-foreground shadow-sm"
                                         : "text-muted-foreground hover:text-foreground"
@@ -267,7 +267,7 @@ export function EditorView() {
                             <button
                                 onClick={() => setViewMode('preview')}
                                 className={cn(
-                                    "px-6 py-1.5 text-sm font-medium rounded-md transition-colors",
+                                    "px-3 sm:px-6 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors",
                                     viewMode === 'preview'
                                         ? "bg-background text-foreground shadow-sm"
                                         : "text-muted-foreground hover:text-foreground"
@@ -279,7 +279,7 @@ export function EditorView() {
                     </div>
 
                     {/* Center: Project Title */}
-                    <div className="w-[400px] flex justify-center px-4 pointer-events-none">
+                    <div className="w-full md:w-[400px] flex justify-center px-4 pointer-events-none order-3 md:order-2">
                         <Input
                             value={title || ''}
                             onChange={(e) => {
@@ -293,14 +293,14 @@ export function EditorView() {
                     </div>
 
                     {/* Right: Action Buttons */}
-                    <div className="flex-1 flex justify-end items-center gap-2">
+                    <div className="flex-1 flex justify-end items-center gap-2 order-2 md:order-3 min-w-[140px]">
                         <Button
                             variant={isDirty ? "default" : "secondary"}
                             size="sm"
                             onClick={handleSave}
                             disabled={isSaving || (!isDirty && saveStatus !== 'success')}
                             className={cn(
-                                "transition-all min-w-[100px]",
+                                "transition-all min-w-[80px] sm:min-w-[100px]",
                                 isDirty ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-md border-indigo-200" : "text-slate-500",
                                 saveStatus === 'success' && "bg-green-600 hover:bg-green-700 text-white"
                             )}
@@ -308,17 +308,20 @@ export function EditorView() {
                             {isSaving ? (
                                 <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Saving...
+                                    <span className="hidden sm:inline">Saving...</span>
+                                    <span className="sm:hidden">...</span>
                                 </>
                             ) : saveStatus === 'success' ? (
                                 <>
                                     <Check className="w-4 h-4 mr-2" />
-                                    Saved!
+                                    <span className="hidden sm:inline">Saved!</span>
+                                    <span className="sm:hidden">Saved</span>
                                 </>
                             ) : (
                                 <>
                                     <Save className="w-4 h-4 mr-2" />
-                                    Save
+                                    <span className="hidden sm:inline">Save</span>
+                                    <span className="sm:hidden">Save</span>
                                 </>
                             )}
                         </Button>
@@ -330,8 +333,8 @@ export function EditorView() {
                             disabled={isSaving}
                             className={isSaving ? "opacity-50 cursor-not-allowed" : ""}
                         >
-                            <Share2 className="w-4 h-4 mr-2" />
-                            Share
+                            <Share2 className="w-4 h-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Share</span>
                         </Button>
                         <Button
                             size="sm"
@@ -339,8 +342,8 @@ export function EditorView() {
                             disabled={viewMode !== 'preview'}
                             title={viewMode !== 'preview' ? "Switch to Preview to export PDF" : "Export as PDF"}
                         >
-                            <Download className="w-4 h-4 mr-2" />
-                            Export PDF
+                            <Download className="w-4 h-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Export PDF</span>
                         </Button>
                     </div>
                 </div>
