@@ -280,6 +280,7 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                                 onTap={() => selectShape(mask.id)}
                                 onDragEnd={(e) => handleDragEnd(e, mask.id)}
                                 onTransformEnd={(e) => handleTransformEnd(e, mask.id)}
+                                strokeScaleEnabled={false}
                                 onMouseEnter={(e) => {
                                     const container = e.target.getStage()?.container();
                                     if (container) container.style.cursor = 'move';
