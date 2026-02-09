@@ -69,10 +69,22 @@ class GeminiService:
         if not project_id:
             raise ValueError("PROJECT_ID not set in environment variables")
             
+        # 429エラー対策: リトライ設定
+        retry_options = types.HttpRetryOptions(
+            attempts=10,
+            initial_delay=10,
+            max_delay=60,
+            exp_base=2,
+            jitter=1
+        )
+
         self.client = genai.Client(
             vertexai=True,
             project=project_id,
-            location=location
+            location=location,
+            http_options=types.HttpOptions(
+                retry_options=retry_options
+            )
         )
         
         self.model_name = os.getenv("MODEL_NAME", "gemini-3-flash-preview")
