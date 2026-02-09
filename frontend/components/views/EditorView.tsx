@@ -107,7 +107,13 @@ export function EditorView() {
         const step = getStep(stepIndex);
         if (!step) return;
 
-        const highlightMask = newMasks.find(m => m.type === 'highlight');
+        const highlightMasks = newMasks.filter(m => m.type === 'highlight').map(m => ({
+            ymin: m.box_2d[0],
+            xmin: m.box_2d[1],
+            ymax: m.box_2d[2],
+            xmax: m.box_2d[3]
+        }));
+
         const privacyMasks = newMasks.filter(m => m.type === 'privacy' || !m.type).map(m => ({
             label: m.label || 'privacy',
             box: {
@@ -118,19 +124,9 @@ export function EditorView() {
             }
         }));
 
-        let highlight_box = undefined;
-        if (highlightMask) {
-            highlight_box = {
-                ymin: highlightMask.box_2d[0],
-                xmin: highlightMask.box_2d[1],
-                ymax: highlightMask.box_2d[2],
-                xmax: highlightMask.box_2d[3]
-            };
-        }
-
         updateStep(stepIndex, {
             ...step,
-            highlight_box: highlight_box,
+            highlight_boxes: highlightMasks,
             mask_boxes: privacyMasks
         });
         setIsDirty(true);
@@ -154,14 +150,23 @@ export function EditorView() {
                 const fullImageUrl = isAbsolute ? step.image_url : `http://localhost:8000${step.image_url}`;
 
                 let imageUrlForMarkdown = fullImageUrl;
-                const combinedMasks = [];
-                if (step.highlight_box) {
-                    combinedMasks.push({
-                        type: 'highlight',
-                        label: 'highlight',
-                        box_2d: [step.highlight_box.ymin, step.highlight_box.xmin, step.highlight_box.ymax, step.highlight_box.xmax]
+                // Type definition for custom mask object
+                type VideoMask = {
+                    type: 'highlight' | 'privacy';
+                    label: string;
+                    box_2d: number[];
+                };
+                const combinedMasks: VideoMask[] = [];
+                if (step.highlight_boxes) {
+                    step.highlight_boxes.forEach((box: any) => {
+                        combinedMasks.push({
+                            type: 'highlight',
+                            label: 'highlight',
+                            box_2d: [box.ymin, box.xmin, box.ymax, box.xmax]
+                        });
                     });
                 }
+
                 if (step.mask_boxes) {
                     step.mask_boxes.forEach((m: any) => {
                         combinedMasks.push({
@@ -367,16 +372,17 @@ export function EditorView() {
                                                             <ImageMaskEditor
                                                                 imageUrl={step.image_url?.startsWith("http") ? step.image_url : `http://localhost:8000${step.image_url}`}
                                                                 initialMasks={[
-                                                                    ...(step.highlight_box ? [{
+                                                                    ...(step.highlight_boxes ? step.highlight_boxes.map((box: any) => ({
                                                                         type: 'highlight',
                                                                         label: 'highlight',
-                                                                        box_2d: [step.highlight_box.ymin, step.highlight_box.xmin, step.highlight_box.ymax, step.highlight_box.xmax]
-                                                                    } as any] : []),
+                                                                        box_2d: [box.ymin, box.xmin, box.ymax, box.xmax]
+                                                                    } as any)) : []
+                                                                    ),
                                                                     ...(step.mask_boxes ? step.mask_boxes.map((m: any) => ({
                                                                         type: 'privacy',
                                                                         label: m.label,
                                                                         box_2d: [m.box.ymin, m.box.xmin, m.box.ymax, m.box.xmax]
-                                                                    })) : [])
+                                                                    } as any)) : [])
                                                                 ]}
                                                                 onUpdate={(newMasks) => handleMaskUpdate(index, newMasks)}
                                                             />

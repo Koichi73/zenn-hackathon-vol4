@@ -55,7 +55,7 @@ class ManualStep(BaseModel):
     timestamp: str
     title: str
     description: str
-    highlight_box: BoundingBox
+    highlight_boxes: List[BoundingBox]
     mask_boxes: List[MaskItem]
     image_url: Optional[str] = None # Added field for image URL
 
@@ -108,7 +108,7 @@ class GeminiService:
                 "timestamp": s.timestamp,
                 "title": s.title,
                 "description": "", # Loading state handled by frontend
-                "highlight_box": None,
+                "highlight_boxes": [],
                 "mask_boxes": [],
                 "image_url": None
             })
@@ -278,7 +278,7 @@ class GeminiService:
                     timestamp=timestamp,
                     title=title,
                     description=parsed_response.description,
-                    highlight_box=parsed_response.highlight_box,
+                    highlight_boxes=[parsed_response.highlight_box] if parsed_response.highlight_box else [],
                     mask_boxes=parsed_response.mask_boxes,
                     image_url=image_url
                 )
