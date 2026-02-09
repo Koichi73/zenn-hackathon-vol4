@@ -151,44 +151,62 @@ class GeminiService:
         
                 print(f"Phase 2 complete. Extracted {len(valid_steps)} images.")
                 
-                # Phase 3: Image Analysis Loop & Incremental Update
+                # Phase 3: Image Analysis Loop & Incremental Update (Parallelized)
                 manual_service.update_manual_status(user_id, manual_id, "analyzing_details")
-                print("Phase 3: Analyzing images sequentially for real-time updates...")
+                print("Phase 3: Analyzing images in parallel for real-time updates...")
                 
-                for i, step_data in enumerate(valid_steps):
-                    local_file_path = step_data.get("image_path")
-                    title = step_data.get("title")
-                    timestamp = step_data.get("timestamp")
-        
-                    # 1. 画像アップロード (Temp -> GCS)
-                    filename = os.path.basename(local_file_path)
-                    gcs_dest_path = f"manuals/{manual_id}/images/{filename}"
-                    
-                    try:
-                        public_image_url = await asyncio.to_thread(
-                            gcs_repo.upload_file,
-                            local_file_path,
-                            gcs_dest_path
-                        )
-                        print(f"Uploaded image to: {public_image_url}")
+                # Semaphore to limit concurrency (e.g., 5 parallel requests)
+                semaphore = asyncio.Semaphore(5)
+
+                async def _process_single_step(i: int, step_data: dict):
+                    async with semaphore:
+                        local_file_path = step_data.get("image_path")
+                        title = step_data.get("title")
+                        timestamp = step_data.get("timestamp")
+            
+                        # 1. 画像アップロード (Temp -> GCS)
+                        filename = os.path.basename(local_file_path)
+                        gcs_dest_path = f"manuals/{manual_id}/images/{filename}"
                         
-                        # Gemini解析用に gs:// から始まるURIを作成
-                        gcs_image_uri = gcs_repo.get_gcs_uri(gcs_dest_path)
+                        try:
+                            public_image_url = await asyncio.to_thread(
+                                gcs_repo.upload_file,
+                                local_file_path,
+                                gcs_dest_path
+                            )
+                            print(f"Uploaded image to: {public_image_url}")
+                            
+                            # Gemini解析用に gs:// から始まるURIを作成
+                            gcs_image_uri = gcs_repo.get_gcs_uri(gcs_dest_path)
+                            
+                        except Exception as e:
+                            print(f"Image upload failed for step {i}: {e}")
+                            return
+
+                        # 2. 詳細解析
+                        analyzed_step = await self.analyze_single_image(gcs_image_uri, title, timestamp, public_image_url)
                         
-                    except Exception as e:
-                        print(f"Image upload failed for step {i}: {e}")
-                        continue
-        
-                    # 2. 詳細解析
-                    analyzed_step = await self.analyze_single_image(gcs_image_uri, title, timestamp, public_image_url)
-                    
-                    if analyzed_step:
-                        # 3. リスト更新
-                        step_dict = analyzed_step.model_dump()
-                        current_steps[i] = step_dict
-                        
-                        # [Firestore Update] 1ステップごとに更新
-                        manual_service.update_manual_steps(user_id, manual_id, current_steps)
+                        if analyzed_step:
+                            # 3. リスト更新
+                            step_dict = analyzed_step.model_dump()
+                            current_steps[i] = step_dict
+                            
+                            # [Firestore Update] 1ステップごとに更新
+                            # 注意: 並列実行時に競合する可能性がありますが、
+                            # Firestoreは最終書き込み勝ち(Last Write Wins)なので、
+                            # 頻度が高すぎなければ実用上は問題ないことが多いです。
+                            # 厳密にはBatch書き込みやトランザクションが必要ですが、
+                            # リアルタイム反映のために個別に更新します。
+                            try:
+                                manual_service.update_manual_steps(user_id, manual_id, current_steps)
+                            except Exception as e:
+                                print(f"Firestore update failed for step {i}: {e}")
+
+                # Create tasks for all steps
+                tasks = [_process_single_step(i, step_data) for i, step_data in enumerate(valid_steps)]
+                
+                # Execute all tasks concurrently
+                await asyncio.gather(*tasks)
         
                 print("Phase 3 complete.")
                 await manual_service.complete_manual_job(user_id, manual_id, current_steps)
