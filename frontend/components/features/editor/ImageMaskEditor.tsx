@@ -216,14 +216,14 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
     return (
         <div className={cn("space-y-2", className)}>
             {/* Toolbar */}
-            <div className="flex items-center gap-2 p-1 bg-white border rounded-lg shadow-sm w-fit">
+            <div className="flex flex-wrap items-center gap-2 p-1 bg-white border rounded-lg shadow-sm w-fit max-w-full">
                 <div className="flex items-center gap-1 border-r pr-2 mr-1">
-                    <span className="text-xs font-semibold text-slate-500 px-2">Edit Tool</span>
+                    <span className="text-xs font-semibold text-slate-500 px-2 whitespace-nowrap">Edit Tool</span>
                 </div>
 
                 <button
                     onClick={() => addMask('privacy')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded transition-colors whitespace-nowrap"
                     title="Add Privacy Mask"
                 >
                     <Plus className="w-3.5 h-3.5" />
@@ -231,20 +231,20 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                 </button>
                 <button
                     onClick={() => addMask('highlight')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors whitespace-nowrap"
                     title="Add Highlight Frame"
                 >
                     <Scan className="w-3.5 h-3.5" />
                     Add Highlight
                 </button>
 
-                <div className="w-px h-4 bg-slate-200 mx-1" />
+                <div className="w-px h-4 bg-slate-200 mx-1 hidden sm:block" />
 
                 <button
                     onClick={removeSelectedMask}
                     disabled={!selectedId}
                     className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors",
+                        "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors whitespace-nowrap",
                         selectedId
                             ? "text-red-600 hover:bg-red-50"
                             : "text-slate-300 cursor-not-allowed"
