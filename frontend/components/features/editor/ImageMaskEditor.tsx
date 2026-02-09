@@ -39,6 +39,8 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
     // Initialize masks from props
     useEffect(() => {
         if (image && initialMasks) {
+            const usedIds = new Set<string>();
+
             const newMasks = initialMasks.map((m, i) => {
                 const coords = m.box_2d;
                 let [ymin, xmin, ymax, xmax] = coords;
@@ -48,11 +50,17 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                 const scaleY = image.naturalHeight / 1000;
 
                 // Try to preserve existing ID to maintain selection state
-                const existingId = masks.find(existing =>
+                const existingMask = masks.find(existing =>
+                    !usedIds.has(existing.id) &&
                     Math.abs(existing.x - xmin * scaleX) < 1 &&
                     Math.abs(existing.y - ymin * scaleY) < 1
-                )?.id;
-                const id = existingId || `mask-${i}`;
+                );
+
+                if (existingMask) {
+                    usedIds.add(existingMask.id);
+                }
+
+                const id = existingMask?.id || `mask-${i}`;
 
                 return {
                     id: id,
@@ -93,12 +101,16 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
 
     // Setup transformer
     useEffect(() => {
-        if (selectedId && transformerRef.current && stageRef.current) {
-            const node = stageRef.current.findOne('#' + selectedId);
-            if (node) {
-                transformerRef.current.nodes([node]);
-                transformerRef.current.getLayer()?.batchDraw();
+        if (transformerRef.current && stageRef.current) {
+            if (selectedId) {
+                const node = stageRef.current.findOne('#' + selectedId);
+                if (node) {
+                    transformerRef.current.nodes([node]);
+                }
+            } else {
+                transformerRef.current.nodes([]);
             }
+            transformerRef.current.getLayer()?.batchDraw();
         }
     }, [selectedId]);
 
@@ -252,7 +264,8 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                     scaleX={scale}
                     scaleY={scale}
                     onMouseDown={(e) => {
-                        const clickedOnEmpty = e.target === e.target.getStage();
+                        // Check if clicked directly on stage OR on the background image
+                        const clickedOnEmpty = e.target === e.target.getStage() || e.target.name() === 'background';
                         if (clickedOnEmpty) {
                             selectShape(null);
                         }
@@ -261,7 +274,7 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                     style={{ cursor: 'crosshair' }}
                 >
                     <Layer>
-                        <KonvaImage image={image} />
+                        <KonvaImage image={image} name="background" />
                         {masks.map((mask) => (
                             <Rect
                                 key={mask.id}
@@ -270,16 +283,17 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                                 y={mask.y}
                                 width={mask.width}
                                 height={mask.height}
-                                fill={mask.type === 'privacy' ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 0, 0, 0.0)"}
+                                fill={mask.type === 'privacy' ? "#000000" : "rgba(255, 0, 0, 0.0)"}
                                 stroke="#ef4444"
-                                strokeWidth={mask.id === selectedId ? 4 / scale : (mask.type === 'highlight' ? 4 / scale : 0)}
+                                strokeWidth={mask.type === 'highlight' ? 4 / scale : 0}
                                 dash={mask.type === 'highlight' ? undefined : undefined}
-                                opacity={mask.type === 'privacy' ? 1 : 1}
+                                opacity={1}
                                 draggable
                                 onClick={() => selectShape(mask.id)}
                                 onTap={() => selectShape(mask.id)}
                                 onDragEnd={(e) => handleDragEnd(e, mask.id)}
                                 onTransformEnd={(e) => handleTransformEnd(e, mask.id)}
+                                strokeScaleEnabled={false}
                                 onMouseEnter={(e) => {
                                     const container = e.target.getStage()?.container();
                                     if (container) container.style.cursor = 'move';

@@ -13,12 +13,19 @@ function generateMarkdown(manual: any): string {
 
         if (step.image_url) {
             // Combine highlight_box and mask_boxes for preview rendering
-            const combinedMasks = [];
-            if (step.highlight_box) {
-                combinedMasks.push({
-                    type: 'highlight',
-                    label: 'highlight',
-                    box_2d: [step.highlight_box.ymin, step.highlight_box.xmin, step.highlight_box.ymax, step.highlight_box.xmax]
+            type VideoMask = {
+                type: 'highlight' | 'privacy';
+                label: string;
+                box_2d: number[];
+            };
+            const combinedMasks: VideoMask[] = [];
+            if (step.highlight_boxes) {
+                step.highlight_boxes.forEach((box: any) => {
+                    combinedMasks.push({
+                        type: 'highlight',
+                        label: 'highlight',
+                        box_2d: [box.ymin, box.xmin, box.ymax, box.xmax]
+                    });
                 });
             }
             if (step.mask_boxes) {

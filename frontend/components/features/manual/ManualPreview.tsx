@@ -61,7 +61,7 @@ export function ManualPreview({ markdown, manualId, readOnly = false, showCommen
                                     key={i}
                                     className={isHighlight
                                         ? "absolute border-4 border-red-600 bg-transparent"
-                                        : "absolute bg-black/80"
+                                        : "absolute bg-black"
                                     }
                                     style={{
                                         top: `${ymin / 10}%`,

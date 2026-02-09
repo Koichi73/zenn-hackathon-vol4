@@ -11,12 +11,12 @@ interface Step {
   description: string;
   timestamp: string;
   image_url: string | null;
-  highlight_box?: {
+  highlight_boxes?: Array<{
     ymin: number;
     xmin: number;
     ymax: number;
     xmax: number;
-  };
+  }>;
   mask_boxes?: Array<{
     label: string;
     box: {
