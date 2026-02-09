@@ -103,6 +103,16 @@ export function EditorView() {
         }
     };
 
+    const handleTitleChange = (index: number, newTitle: string) => {
+        const step = getStep(index);
+        if (step) {
+            updateStep(index, { ...step, title: newTitle });
+            setIsDirty(true);
+            setSaveStatus('idle');
+        }
+    };
+
+
     const handleMaskUpdate = (stepIndex: number, newMasks: any[]) => {
         const step = getStep(stepIndex);
         if (!step) return;
@@ -269,7 +279,7 @@ export function EditorView() {
                     </div>
 
                     {/* Center: Project Title */}
-                    <div className="w-[300px] flex justify-center px-4 pointer-events-none">
+                    <div className="w-[400px] flex justify-center px-4 pointer-events-none">
                         <Input
                             value={title || ''}
                             onChange={(e) => {
@@ -277,7 +287,7 @@ export function EditorView() {
                                 setIsDirty(true);
                                 setSaveStatus('idle');
                             }}
-                            className="text-center font-bold text-lg h-9 border-transparent hover:border-input focus:border-input bg-transparent px-2 shadow-none w-full pointer-events-auto"
+                            className="text-center font-bold !text-xl h-9 border-transparent hover:border-input focus:border-input bg-transparent px-2 shadow-none w-full pointer-events-auto"
                             placeholder={filename}
                         />
                     </div>
@@ -349,18 +359,26 @@ export function EditorView() {
                                         ref={(el) => { stepRefs.current[index] = el }}
                                         className="scroll-mt-48"
                                     >
-                                        <Card className="overflow-hidden shadow-sm border-slate-200">
+                                        <Card className="overflow-hidden shadow-sm border-slate-200 py-0">
                                             <CardContent className="p-0">
                                                 {/* Card Header with Step Info */}
                                                 <div className="flex items-center justify-between p-4 border-b bg-white">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm">
+                                                    <div className="flex items-center gap-3 w-full">
+                                                        <span className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm flex-shrink-0">
                                                             {index + 1}
                                                         </span>
-                                                        <div>
-                                                            <h3 className="font-semibold text-base text-slate-900 border-none p-0 focus-visible:ring-0">
-                                                                Step {index + 1}
-                                                            </h3>
+                                                        <div className="flex-1 w-full min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                {/* <span className="text-lg font-medium text-slate-500 whitespace-nowrap">
+                                                                    Step {index + 1}
+                                                                </span> */}
+                                                                <Input
+                                                                    value={step.title || ''}
+                                                                    onChange={(e) => handleTitleChange(index, e.target.value)}
+                                                                    className="font-semibold !text-xl text-slate-900 border-transparent hover:border-slate-200 focus:border-indigo-500 px-2 h-10 w-full bg-transparent"
+                                                                    placeholder="Step Title"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
