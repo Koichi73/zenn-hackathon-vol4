@@ -39,6 +39,8 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
     // Initialize masks from props
     useEffect(() => {
         if (image && initialMasks) {
+            const usedIds = new Set<string>();
+
             const newMasks = initialMasks.map((m, i) => {
                 const coords = m.box_2d;
                 let [ymin, xmin, ymax, xmax] = coords;
@@ -48,11 +50,17 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                 const scaleY = image.naturalHeight / 1000;
 
                 // Try to preserve existing ID to maintain selection state
-                const existingId = masks.find(existing =>
+                const existingMask = masks.find(existing =>
+                    !usedIds.has(existing.id) &&
                     Math.abs(existing.x - xmin * scaleX) < 1 &&
                     Math.abs(existing.y - ymin * scaleY) < 1
-                )?.id;
-                const id = existingId || `mask-${i}`;
+                );
+
+                if (existingMask) {
+                    usedIds.add(existingMask.id);
+                }
+
+                const id = existingMask?.id || `mask-${i}`;
 
                 return {
                     id: id,
