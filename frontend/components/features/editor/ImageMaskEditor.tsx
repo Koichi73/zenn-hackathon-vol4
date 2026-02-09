@@ -93,12 +93,16 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
 
     // Setup transformer
     useEffect(() => {
-        if (selectedId && transformerRef.current && stageRef.current) {
-            const node = stageRef.current.findOne('#' + selectedId);
-            if (node) {
-                transformerRef.current.nodes([node]);
-                transformerRef.current.getLayer()?.batchDraw();
+        if (transformerRef.current && stageRef.current) {
+            if (selectedId) {
+                const node = stageRef.current.findOne('#' + selectedId);
+                if (node) {
+                    transformerRef.current.nodes([node]);
+                }
+            } else {
+                transformerRef.current.nodes([]);
             }
+            transformerRef.current.getLayer()?.batchDraw();
         }
     }, [selectedId]);
 
@@ -252,7 +256,8 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                     scaleX={scale}
                     scaleY={scale}
                     onMouseDown={(e) => {
-                        const clickedOnEmpty = e.target === e.target.getStage();
+                        // Check if clicked directly on stage OR on the background image
+                        const clickedOnEmpty = e.target === e.target.getStage() || e.target.name() === 'background';
                         if (clickedOnEmpty) {
                             selectShape(null);
                         }
@@ -261,7 +266,7 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                     style={{ cursor: 'crosshair' }}
                 >
                     <Layer>
-                        <KonvaImage image={image} />
+                        <KonvaImage image={image} name="background" />
                         {masks.map((mask) => (
                             <Rect
                                 key={mask.id}
