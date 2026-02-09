@@ -1,21 +1,14 @@
 
 import firebase_admin
-from firebase_admin import auth, credentials
+from firebase_admin import auth
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import os
 from typing import Optional
 
 # Initialize Firebase Admin
 if not firebase_admin._apps:
     try:
-        cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        if cred_path:
-            cred = credentials.Certificate(cred_path)
-            firebase_admin.initialize_app(cred)
-        else:
-            # Fallback for GCloud environment or simplified init
-            firebase_admin.initialize_app()
+        firebase_admin.initialize_app()
     except Exception as e:
         print(f"Failed to initialize Firebase Admin: {e}")
 
