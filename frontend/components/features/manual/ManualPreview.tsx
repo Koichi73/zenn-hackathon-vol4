@@ -68,7 +68,9 @@ export function ManualPreview({ markdown, manualId, readOnly = false, showCommen
                                         left: `${xmin / 10}%`,
                                         width: `${(xmax - xmin) / 10}%`,
                                         height: `${(ymax - ymin) / 10}%`,
-                                    }}
+                                        printColorAdjust: 'exact',
+                                        WebkitPrintColorAdjust: 'exact',
+                                    } as React.CSSProperties}
                                     title={mask.label || (isHighlight ? "Button Highlight" : "Privacy Mask")}
                                 />
                             );
