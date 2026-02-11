@@ -12,10 +12,17 @@ os.makedirs("app/static/images", exist_ok=True)
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# Configure CORS
+allowed_origins = [
+    "http://localhost:3000",
+]
+
+frontend_url = os.environ.get("FRONTEND_URL")
+if frontend_url:
+    allowed_origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
