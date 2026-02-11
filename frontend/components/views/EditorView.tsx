@@ -157,7 +157,8 @@ export function EditorView() {
 
             if (step.image_url) {
                 const isAbsolute = step.image_url.startsWith("http");
-                const fullImageUrl = isAbsolute ? step.image_url : `http://localhost:8000${step.image_url}`;
+                const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
+                const fullImageUrl = isAbsolute ? step.image_url : `${apiBaseUrl}${step.image_url}`;
 
                 let imageUrlForMarkdown = fullImageUrl;
                 // Type definition for custom mask object
@@ -391,7 +392,7 @@ export function EditorView() {
                                                     <div className="w-full relative shadow-sm bg-white rounded-lg p-2">
                                                         {step.image_url ? (
                                                             <ImageMaskEditor
-                                                                imageUrl={step.image_url?.startsWith("http") ? step.image_url : `http://localhost:8000${step.image_url}`}
+                                                                imageUrl={step.image_url?.startsWith("http") ? step.image_url : `${(process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000')}${step.image_url}`}
                                                                 initialMasks={[
                                                                     ...(step.highlight_boxes ? step.highlight_boxes.map((box: any) => ({
                                                                         type: 'highlight',
