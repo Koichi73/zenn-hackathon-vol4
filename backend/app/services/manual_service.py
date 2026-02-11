@@ -256,3 +256,34 @@ class ManualService:
         except Exception as e:
             print(f"Error getting user manuals: {e}")
             return []
+
+    def delete_manual(self, user_id: str, manual_id: str) -> bool:
+        """
+        マニュアルを削除する（Firestore + GCS）
+        ユーザーの所有権を確認してから削除
+        """
+        collection_path = f"users/{user_id}/manuals"
+        
+        try:
+            # 1. マニュアルの存在確認と所有権チェック
+            doc = self.firestore_repository.get_document(collection_path, manual_id)
+            if not doc:
+                print(f"Manual {manual_id} not found for user {user_id}")
+                return False
+            
+            # 2. Firestoreから削除
+            self.firestore_repository.delete_document(collection_path, manual_id)
+            print(f"Deleted Firestore document for manual {manual_id}")
+            
+            # 3. GCSからファイルを削除
+            try:
+                self.gcs_repository.delete_manual_files(manual_id)
+                print(f"Deleted GCS files for manual {manual_id}")
+            except Exception as e:
+                print(f"Warning: Failed to delete GCS files for manual {manual_id}: {e}")
+                # Firestoreは既に削除されているので、GCS削除失敗はログのみ
+            
+            return True
+        except Exception as e:
+            print(f"Error deleting manual {manual_id}: {e}")
+            return False

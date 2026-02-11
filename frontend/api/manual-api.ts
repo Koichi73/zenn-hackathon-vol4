@@ -74,3 +74,25 @@ export async function saveManual(manualId: string, title: string, steps: any[]) 
     return await response.json();
 }
 
+// マニュアルの削除
+export async function deleteManual(manualId: string) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+    const token = await user.getIdToken();
+
+    const response = await fetch(`${API_BASE_URL}/manuals/${manualId}`, {
+        method: "DELETE",
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+    });
+
+    if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || `Failed to delete manual: ${response.statusText}`);
+    }
+
+    return await response.json();
+}
+
+

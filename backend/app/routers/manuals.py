@@ -71,3 +71,20 @@ async def list_user_manuals(user_id: str = Depends(get_current_user)):
     manuals = service.get_user_manuals(user_id)
     
     return {"manuals": manuals}
+
+
+@router.delete("/manuals/{manual_id}")
+async def delete_manual(
+    manual_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    マニュアルを削除する（Firestore + GCS）
+    """
+    service = ManualService()
+    success = service.delete_manual(user_id, manual_id)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Manual not found")
+    
+    return {"status": "success", "message": "Manual deleted successfully"}

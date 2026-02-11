@@ -77,3 +77,19 @@ class GCSRepository:
             blob_name = parts[1]
         
         self.download_file(blob_name, destination_file_path)
+
+    def delete_manual_files(self, manual_id: str):
+        """
+        マニュアルに関連するすべてのファイルを削除する
+        manuals/{manual_id}/ 配下のすべてのファイルを削除
+        """
+        prefix = f"manuals/{manual_id}/"
+        blobs = self.bucket.list_blobs(prefix=prefix)
+        
+        deleted_count = 0
+        for blob in blobs:
+            blob.delete()
+            deleted_count += 1
+        
+        print(f"Deleted {deleted_count} files for manual {manual_id}")
+        return deleted_count

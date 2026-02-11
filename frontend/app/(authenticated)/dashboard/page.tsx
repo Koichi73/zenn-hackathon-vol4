@@ -2,20 +2,29 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Video, Loader2, MessageCircle, Eye, Play, X } from 'lucide-react';
+import { Upload, Video, Loader2, MessageCircle, Eye, Play, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getAllUnreadCounts } from "@/api/comment-api";
+import { deleteManual } from "@/api/manual-api";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
+    DialogFooter,
+    DialogDescription,
 } from "@/components/ui/dialog"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 const SAMPLES = [
     {
@@ -39,6 +48,9 @@ export default function DashboardPage() {
     const [isDragging, setIsDragging] = useState(false);
     const [unreadCounts, setUnreadCounts] = useState<{ [manualId: string]: number }>({});
     const [previewVideo, setPreviewVideo] = useState<string | null>(null);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [manualToDelete, setManualToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchManuals = async (user: any) => {
         if (!user) return;
@@ -138,6 +150,33 @@ export default function DashboardPage() {
         } catch (err) {
             console.error("Failed to load sample video:", err);
             // Error is handled by VideoProvider's error state
+        }
+    };
+
+    const handleDeleteClick = (manualId: string, e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent navigation to editor
+        setManualToDelete(manualId);
+        setDeleteConfirmOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!manualToDelete) return;
+
+        setIsDeleting(true);
+        try {
+            await deleteManual(manualToDelete);
+            // Refresh the manual list
+            const user = auth.currentUser;
+            if (user) {
+                await fetchManuals(user);
+            }
+            setDeleteConfirmOpen(false);
+            setManualToDelete(null);
+        } catch (error) {
+            console.error("Failed to delete manual:", error);
+            alert("マニュアルの削除に失敗しました。もう一度お試しください。");
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -358,9 +397,29 @@ export default function DashboardPage() {
                                 className="border rounded-lg p-6 bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow cursor-pointer relative"
                                 onClick={() => router.push(`/editor/${manual.id}`)}
                             >
+                                {/* Three-dot menu */}
+                                <div className="absolute top-2 right-2 z-20" onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button className="p-1.5 rounded-md bg-white/80 backdrop-blur-sm shadow-sm outline-none focus-visible:outline-none">
+                                                <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                                variant="destructive"
+                                                onClick={(e) => handleDeleteClick(manual.id, e)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                削除
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+
                                 {/* Unread Badge */}
                                 {unreadCount > 0 && (
-                                    <div className="absolute top-3 right-3 bg-blue-500 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md z-10">
+                                    <div className="absolute top-3 left-3 bg-blue-500 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md z-10">
                                         <MessageCircle className="w-3 h-3" />
                                         <span className="font-medium">{unreadCount}</span>
                                     </div>
@@ -368,7 +427,7 @@ export default function DashboardPage() {
 
                                 <div className="h-40 bg-muted rounded-md mb-4 flex items-center justify-center text-muted-foreground relative overflow-hidden">
                                     {manual.thumbnail_url ? (
-                                        <img src={manual.thumbnail_url} alt={manual.title} className="object-cover w-full h-full" />
+                                        <img src={manual.thumbnail_url} alt={manual.title} className="object-cover w-full h-full select-none" draggable="false" />
                                     ) : (
                                         <Video className="h-12 w-12 opacity-20" />
                                     )}
@@ -410,6 +469,44 @@ export default function DashboardPage() {
                     })}
                 </div>
             )}
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>マニュアルを削除しますか?</DialogTitle>
+                        <DialogDescription>
+                            この操作は取り消せません。マニュアルとすべての関連データが完全に削除されます。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeleteConfirmOpen(false)}
+                            disabled={isDeleting}
+                        >
+                            キャンセル
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeleteConfirm}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    削除中...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    削除
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
