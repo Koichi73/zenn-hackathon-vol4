@@ -285,7 +285,7 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                                 height={mask.height}
                                 fill={mask.type === 'privacy' ? "#000000" : "rgba(255, 0, 0, 0.0)"}
                                 stroke="#ef4444"
-                                strokeWidth={mask.type === 'highlight' ? 4 / scale : 0}
+                                strokeWidth={mask.type === 'highlight' ? (dimensions.width < 600 ? 3 : 6) : 0}
                                 dash={mask.type === 'highlight' ? undefined : undefined}
                                 opacity={1}
                                 draggable
