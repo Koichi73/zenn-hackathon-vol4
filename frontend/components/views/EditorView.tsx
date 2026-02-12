@@ -149,7 +149,7 @@ export function EditorView() {
 
     const generateMarkdown = () => {
         if (!steps) return '';
-        let md = `# ${filename}\n\n`;
+        let md = '';
 
         steps.forEach((step: any, index: number) => {
             md += `## Step ${index + 1}: ${step.title}\n`;
@@ -355,7 +355,7 @@ export function EditorView() {
                     <div className="w-full h-full relative overflow-y-auto">
                         {/* Main Editor Area */}
                         <div className="w-full min-h-full px-4 py-8 sm:px-8">
-                            <div className="max-w-6xl mx-auto space-y-8 pb-32">
+                            <div className="max-w-4xl mx-auto space-y-8 pb-8">
                                 {steps.map((step, index) => (
                                     <div
                                         key={index}
@@ -445,9 +445,11 @@ export function EditorView() {
                     </div>
                 ) : (
                     /* Preview Mode: Full Screen */
-                    <div className="flex-1 overflow-y-auto bg-slate-100/50 print:bg-white print:overflow-visible">
-                        <div className="max-w-4xl mx-auto p-8 print:p-0 print:max-w-none">
-                            <ManualPreview markdown={generateMarkdown()} manualId={manualId || ''} readOnly={true} showComments={false} />
+                    <div className="w-full h-full relative overflow-y-auto bg-slate-100/50 print:bg-white print:overflow-visible">
+                        <div className="w-full min-h-full px-4 py-8 sm:px-8 print:p-0">
+                            <div className="max-w-4xl mx-auto print:max-w-none">
+                                <ManualPreview markdown={generateMarkdown()} manualId={manualId || ''} readOnly={true} showComments={false} />
+                            </div>
                         </div>
                     </div>
                 )}
