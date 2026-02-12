@@ -43,41 +43,7 @@ export function ManualPreview({ markdown, manualId, readOnly = false, showCommen
         }
 
         return (
-            <div className="relative w-full my-4">
-                <img
-                    src={cleanSrc}
-                    alt={alt}
-                    className="w-full h-auto rounded-lg shadow-sm"
-                />
-                {masks.length > 0 && (
-                    <div className="absolute inset-0 pointer-events-none">
-                        {masks.map((mask, i) => {
-                            if (!mask.box_2d) return null;
-                            const [ymin, xmin, ymax, xmax] = mask.box_2d;
-                            const isHighlight = mask.type === 'highlight';
-
-                            return (
-                                <div
-                                    key={i}
-                                    className={isHighlight
-                                        ? "absolute border-4 border-red-600 bg-transparent"
-                                        : "absolute bg-black"
-                                    }
-                                    style={{
-                                        top: `${ymin / 10}%`,
-                                        left: `${xmin / 10}%`,
-                                        width: `${(xmax - xmin) / 10}%`,
-                                        height: `${(ymax - ymin) / 10}%`,
-                                        printColorAdjust: 'exact',
-                                        WebkitPrintColorAdjust: 'exact',
-                                    } as React.CSSProperties}
-                                    title={mask.label || (isHighlight ? "Button Highlight" : "Privacy Mask")}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+            <ResponsiveImageContainer src={cleanSrc} alt={alt} masks={masks} />
         );
     };
 
@@ -118,6 +84,69 @@ export function ManualPreview({ markdown, manualId, readOnly = false, showCommen
                     </div>
                 ))}
             </div>
+        </div>
+    );
+}
+
+function ResponsiveImageContainer({ src, alt, masks }: { src: string, alt?: string, masks: any[] }) {
+    const containerRef = React.useRef<HTMLDivElement>(null);
+    const [strokeWidth, setStrokeWidth] = React.useState(3);
+
+    React.useEffect(() => {
+        if (!containerRef.current) return;
+
+        const updateWidth = () => {
+            if (containerRef.current) {
+                const width = containerRef.current.offsetWidth;
+                setStrokeWidth(width < 600 ? 3 : 6);
+            }
+        };
+
+        // Initial check
+        updateWidth();
+
+        const observer = new ResizeObserver(updateWidth);
+        observer.observe(containerRef.current);
+
+        return () => observer.disconnect();
+    }, []);
+
+    return (
+        <div ref={containerRef} className="relative w-full my-4">
+            <img
+                src={src}
+                alt={alt}
+                className="w-full h-auto rounded-lg shadow-sm"
+            />
+            {masks.length > 0 && (
+                <div className="absolute inset-0 pointer-events-none">
+                    {masks.map((mask, i) => {
+                        if (!mask.box_2d) return null;
+                        const [ymin, xmin, ymax, xmax] = mask.box_2d;
+                        const isHighlight = mask.type === 'highlight';
+
+                        return (
+                            <div
+                                key={i}
+                                className={isHighlight
+                                    ? "absolute border-red-600 bg-transparent"
+                                    : "absolute bg-black"
+                                }
+                                style={{
+                                    top: `${ymin / 10}%`,
+                                    left: `${xmin / 10}%`,
+                                    width: `${(xmax - xmin) / 10}%`,
+                                    height: `${(ymax - ymin) / 10}%`,
+                                    borderWidth: isHighlight ? `${strokeWidth}px` : undefined,
+                                    printColorAdjust: 'exact',
+                                    WebkitPrintColorAdjust: 'exact',
+                                } as React.CSSProperties}
+                                title={mask.label || (isHighlight ? "Button Highlight" : "Privacy Mask")}
+                            />
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
