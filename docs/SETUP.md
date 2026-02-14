@@ -10,7 +10,7 @@
 - **Python 3.11+**
 - **Node.js 20+**
 - **Google Cloud SDK (gcloud CLI)**
-- **ffmpeg** (音声/動画処理に必要)
+- **ffmpeg** (動画処理に必要)
 
 ## 1. Google Cloud のセットアップ
 
@@ -18,7 +18,6 @@
 
 ### 1.1 プロジェクトの準備
 1. [Google Cloud Console](https://console.cloud.google.com/) で新しいプロジェクトを作成するか、既存のプロジェクトを選択します。
-   - 推奨プロジェクトID: `zenn-hackathon-vol4` (既存設定がこれになっている場合がありますが、自身のIDに合わせてください)
 2. プロジェクトで **Billing (請求)** が有効になっていることを確認します。
 
 ### 1.2 API の有効化
@@ -29,19 +28,13 @@
 gcloud services enable aiplatform.googleapis.com
 ```
 
-### 1.3 認証設定 (ADC)
-ローカルからVertex AIを利用するために、Application Default Credentials (ADC) を設定します。
+### 1.3 認証設定 (Service Account)
+ローカルからVertex AIを利用するために、サービスアカウントを作成し、キーファイルを取得して環境変数に設定します。
 
-```bash
-# ログイン
-gcloud auth login
+1. Google Cloud Consoleでサービスアカウントを作成し、`Vertex AI User` などの適切なロールを付与します。
+2. キーを作成し、JSON形式でダウンロードします。
+3. ダウンロードしたJSONファイルのパスを控えておきます（バックエンドのエラー回避のため）。
 
-# プロジェクトの設定
-gcloud config set project <YOUR_PROJECT_ID>
-
-# ADC認証用ファイルの生成
-gcloud auth application-default login
-```
 
 ---
 
@@ -63,8 +56,9 @@ source .venv/bin/activate
 # Windows:
 # .venv\Scripts\activate
 
-# 依存関係のインストール
-pip install -r requirements.txt
+# 依存関係のインストール (uvを使用)
+pip install uv
+uv pip install -r requirements.txt
 ```
 
 ### 2.2 環境変数の設定
@@ -81,18 +75,12 @@ cp .env.template .env
 ```ini
 PROJECT_ID=<YOUR_PROJECT_ID>
 LOCATION=global
-MODEL_NAME=gemini-1.5-flash-002
+MODEL_NAME=gemini-3-flash-preview
+GOOGLE_APPLICATION_CREDENTIALS=<PATH_TO_YOUR_SERVICE_ACCOUNT_KEY.json>
 BUCKET_NAME=<YOUR_BUCKET_ID>
 FIRESTORE_DATABASE=<YOUR_FIRESTORE_DATABASE>
+GRPC_DNS_RESOLVER=native
 ```
-
-`.env.localファイルの内容を環境に合わせて修正してください。`
-
-```ini
-firebaseのconfigを記載
-```
-
-* `MODEL_NAME`: 利用したいGeminiのモデル名を指定してください（例: `gemini-1.5-flash-002` など）。
 
 ### 2.3 起動確認
 
@@ -112,6 +100,25 @@ Next.js (React) アプリケーションのセットアップです。
 ```bash
 cd frontend
 npm install
+```
+
+### 3.2 環境変数の設定
+
+`frontend/.env.local` ファイルを作成し、Firebaseの設定を記述します。
+
+```bash
+cp .env.local.template .env.local
+```
+
+`.env.local` に以下の変数を設定してください（Firebase Consoleから取得）。
+
+```ini
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+NEXT_PUBLIC_FIREBASE_APP_ID=...
 ```
 
 ### 3.2 起動確認
