@@ -32,13 +32,13 @@ const BUCKET_NAME = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 const SAMPLES = [
     {
         id: 'sample-1',
-        title: 'sample1',
+        title: 'Google Analytics Sample',
         gsUrl: `gs://${BUCKET_NAME}/samples/sample1.mov`,
         previewUrl: `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/samples%2Fsample1.mov?alt=media`,
     },
     {
         id: 'sample-2',
-        title: 'sample2',
+        title: 'WordPress Sample',
         gsUrl: `gs://${BUCKET_NAME}/samples/sample2.mov`,
         previewUrl: `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/samples%2Fsample2.mov?alt=media`,
     },
