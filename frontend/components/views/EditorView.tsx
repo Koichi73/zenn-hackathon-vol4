@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Download, Cast as MaskIcon, X, ChevronRight, PenTool, Save, Share2, Loader2, Check } from 'lucide-react';
+import { Download, Cast as MaskIcon, X, ChevronRight, PenTool, Save, Share2, Loader2, Check, Video } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { ManualPreview } from "@/components/features/manual/ManualPreview";
 import { ImageMaskEditor } from "@/components/features/editor/ImageMaskEditor";
@@ -17,8 +17,9 @@ import { CommentSidebar } from "@/components/features/comments/CommentSidebar";
 import { markManualAsRead } from "@/api/comment-api";
 
 export function EditorView() {
-    const { steps, filename, title, setTitle, updateStep, reset, isProcessing, manualId, setManualId } = useVideo();
+    const { steps, filename, title, setTitle, updateStep, reset, isProcessing, manualId, setManualId, videoUrl } = useVideo();
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+    const [showVideo, setShowVideo] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [isDirty, setIsDirty] = useState(false);
@@ -350,6 +351,40 @@ export function EditorView() {
                 </div>
             </div>
 
+            {/* Video Player Section */}
+            {videoUrl && showVideo && (
+                <div className="bg-black border-b relative group print:hidden">
+                    <div className="container mx-auto max-w-4xl py-2 relative">
+                        <video
+                            src={videoUrl}
+                            controls
+                            className="w-full max-h-[300px] mx-auto rounded-md shadow-lg"
+                        />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-4 right-4 text-white/50 hover:text-white hover:bg-white/10"
+                            onClick={() => setShowVideo(false)}
+                        >
+                            <X className="w-5 h-5" />
+                        </Button>
+                    </div>
+                </div>
+            )}
+            {!showVideo && videoUrl && (
+                <div className="bg-slate-100 border-b py-1 px-4 flex justify-end print:hidden">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-slate-500 hover:text-indigo-600"
+                        onClick={() => setShowVideo(true)}
+                    >
+                        <Video className="w-3 h-3 mr-1" />
+                        Show Video
+                    </Button>
+                </div>
+            )}
+
             {/* Main Content Area */}
             <div className="flex flex-1 overflow-hidden print:overflow-visible print:block print:h-auto relative bg-slate-50">
                 {viewMode === 'edit' ? (
@@ -439,7 +474,7 @@ export function EditorView() {
                         {manualId && (
                             <CommentSidebar
                                 manualId={manualId}
-                                steps={steps}
+                                steps={steps!}
                                 onStepClick={(stepIndex) => scrollToStep(stepIndex)}
                             />
                         )}
@@ -460,6 +495,6 @@ export function EditorView() {
                 isOpen={isShareDialogOpen}
                 onOpenChange={setIsShareDialogOpen}
             />
-        </div>
+        </div >
     );
 }
