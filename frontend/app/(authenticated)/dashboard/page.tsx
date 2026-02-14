@@ -25,6 +25,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { LoadingTips } from "@/components/features/loading/LoadingTips";
 
 const SAMPLES = [
     {
@@ -258,6 +259,9 @@ export default function DashboardPage() {
                                                 <p className="text-sm text-muted-foreground">
                                                     Extracting frames and structure...
                                                 </p>
+                                                <div className="mt-4">
+                                                    <LoadingTips />
+                                                </div>
                                             </div>
                                         </>
                                     ) : (
