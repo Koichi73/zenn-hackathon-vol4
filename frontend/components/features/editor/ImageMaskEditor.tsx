@@ -321,12 +321,6 @@ export function ImageMaskEditor({ imageUrl, initialMasks, onUpdate, className }:
                         />
                     </Layer>
                 </Stage>
-
-                {masks.length === 0 && (
-                    <div className="absolute top-4 left-4 pointer-events-none text-xs text-slate-500 bg-white/80 px-2 py-1 rounded backdrop-blur-sm">
-                        No masks added. Use the controls above to add masks or highlights.
-                    </div>
-                )}
             </div>
 
 
