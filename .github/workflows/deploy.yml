@@ -3,7 +3,7 @@ name: Deploy to Cloud Run
 on:
   push:
     branches:
-      - feature/deploy_config 
+      - main
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -38,7 +38,7 @@ jobs:
       # 4. バックエンドのデプロイ
       - name: Deploy Backend to Cloud Run
         run: |
-          gcloud run deploy test-backend \
+          gcloud run deploy backend \
             --image asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/backend/backend:${{ github.sha }} \
             --region ${{ env.REGION }} \
             --platform managed \
@@ -71,7 +71,7 @@ jobs:
       # 5. フロントエンドのデプロイ
       - name: Deploy Frontend to Cloud Run
         run: |
-          gcloud run deploy test-frontend \
+          gcloud run deploy manual-ai \
             --image asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend/frontend:${{ github.sha }} \
             --region ${{ env.REGION }} \
             --platform managed \
