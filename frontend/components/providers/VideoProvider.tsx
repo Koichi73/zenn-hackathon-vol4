@@ -170,7 +170,8 @@ export function VideoProvider({ children }: { children: ReactNode }) {
 
       const token = await auth.currentUser?.getIdToken();
 
-      const response = await fetch("http://localhost:8000/api/analyze", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${apiUrl}/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

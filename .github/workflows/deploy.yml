@@ -1,0 +1,78 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-northeast1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. Google Cloud 認証
+      # Github の secrets に登録した GCP_SA_KEY (JSON) を使用
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      # 2. Docker を Artifact Registry にログインさせる
+      - name: Docker Auth
+        run: |
+          gcloud auth configure-docker asia-northeast1-docker.pkg.dev --quiet
+
+      # 3. バックエンドのビルド・プッシュ
+      - name: Build and Push Backend
+        run: |
+          docker build -t asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/backend/backend:${{ github.sha }} ./backend
+          docker push asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/backend/backend:${{ github.sha }}
+      
+      # 4. バックエンドのデプロイ
+      - name: Deploy Backend to Cloud Run
+        run: |
+          gcloud run deploy backend \
+            --image asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/backend/backend:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated
+
+      # 5. フロントエンドのビルド・プッシュ
+      # ビルド時に環境変数を注入
+      - name: Build and Push Frontend
+        env:
+          FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY=$FIREBASE_API_KEY \
+            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$FIREBASE_AUTH_DOMAIN \
+            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID \
+            --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET \
+            --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=$FIREBASE_MESSAGING_SENDER_ID \
+            --build-arg NEXT_PUBLIC_FIREBASE_APP_ID=$FIREBASE_APP_ID \
+            --build-arg NEXT_PUBLIC_API_URL=$API_URL \
+            -t asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend/frontend:${{ github.sha }} \
+            ./frontend
+          docker push asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend/frontend:${{ github.sha }}
+      
+      # 5. フロントエンドのデプロイ
+      - name: Deploy Frontend to Cloud Run
+        run: |
+          gcloud run deploy manual-ai \
+            --image asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend/frontend:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated

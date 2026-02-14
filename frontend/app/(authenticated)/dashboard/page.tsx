@@ -56,7 +56,8 @@ export default function DashboardPage() {
         if (!user) return;
         try {
             const token = await user.getIdToken();
-            const response = await fetch("http://localhost:8000/api/manuals", {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+            const response = await fetch(`${apiUrl}/manuals`, {
                 headers: {
                     "Authorization": `Bearer ${token}`
                 }

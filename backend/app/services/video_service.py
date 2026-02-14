@@ -53,20 +53,27 @@ class VideoService:
             ]
             
             try:
+                print(f"DEBUG: Extracting frame {i+1}/{len(steps)} at {timestamp}")
                 # Run blocking subprocess in thread
-                await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     subprocess.run,
                     command,
                     check=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
+                print(f"DEBUG: Frame {i+1} extracted successfully")
                 
                 # Return absolute path so caller can decide what to do (upload to GCS, etc.)
                 step["image_path"] = os.path.abspath(image_path)
                 
             except subprocess.CalledProcessError as e:
-                print(f"Error extracting frame at {timestamp}: {e}")
+                print(f"ERROR: Failed to extract frame at {timestamp}")
+                print(f"ERROR: FFmpeg stderr: {e.stderr.decode() if e.stderr else 'No stderr'}")
+                print(f"ERROR: FFmpeg stdout: {e.stdout.decode() if e.stdout else 'No stdout'}")
+                step["image_path"] = None
+            except Exception as e:
+                print(f"ERROR: Unexpected error extracting frame at {timestamp}: {e}")
                 step["image_path"] = None 
                 
             updated_steps.append(step)
