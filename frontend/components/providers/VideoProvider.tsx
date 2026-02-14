@@ -40,8 +40,10 @@ interface VideoContextType {
   status: string; // "analyzing_structure", "extracting_images", "analyzing_details", "completed", "error"
   error: string | null;
   manualId: string | null;
+  videoUrl: string | null;
   setManualId: (id: string | null) => void;
   processVideo: (file: File) => Promise<void>;
+  processGcsVideo: (gsUrl: string, title: string) => Promise<void>;
   updateStep: (index: number, updatedStep: Step) => void;
   reset: () => void;
 }
@@ -58,6 +60,7 @@ export function VideoProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [manualId, setManualId] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Monitor Auth State
@@ -204,6 +207,60 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // GCSから直接動画を処理
+  // サンプル用の関数
+  const processGcsVideo = async (gsUrl: string, title: string) => {
+    setIsProcessing(true);
+    setError(null);
+    setSteps(null);
+    setFilename(gsUrl.split('/').pop() || "");
+    setManualId(null);
+
+    try {
+      // 1. ID生成
+      const newManualId = crypto.randomUUID();
+
+      setProcessingStage('analyzing');
+
+      // 2. API呼び出し
+      setTitle(title);
+
+      const token = await auth.currentUser?.getIdToken();
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${apiUrl}/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          manual_id: newManualId,
+          video_url: gsUrl,
+          title: title
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.statusText}`);
+      }
+
+      // 3. firestore listenerを開始
+      const data = await response.json();
+      if (data.status === "accepted" && data.manual_id) {
+        console.log("Analysis started for GCS video, Job ID:", data.manual_id);
+        setManualId(data.manual_id);
+      } else {
+        throw new Error("Invalid server response");
+      }
+
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Failed to process GCS video");
+      setIsProcessing(false);
+    }
+  };
+
   const updateStep = (index: number, updatedStep: Step) => {
     if (!steps) return;
     const newSteps = [...steps];
@@ -236,8 +293,10 @@ export function VideoProvider({ children }: { children: ReactNode }) {
         status,
         error,
         manualId,
+        videoUrl,
         setManualId,
         processVideo,
+        processGcsVideo,
         updateStep,
         reset,
       }}

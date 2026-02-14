@@ -163,6 +163,11 @@ class GeminiService:
         
                 print(f"Phase 2 complete. Extracted {len(valid_steps)} images.")
                 
+                # ローカル動画の削除
+                if video_local_path:
+                    Path(video_local_path).unlink(missing_ok=True)
+                    print(f"Deleted local video: {video_local_path}")
+                
                 # Phase 3: Image Analysis Loop & Incremental Update (Parallelized)
                 manual_service.update_manual_status(user_id, manual_id, "analyzing_details")
                 print("Phase 3: Analyzing images in parallel for real-time updates...")
@@ -187,6 +192,9 @@ class GeminiService:
                                 gcs_dest_path
                             )
                             print(f"Uploaded image to: {public_image_url}")
+
+                            # ローカル画像の削除
+                            Path(local_file_path).unlink(missing_ok=True)
                             
                             # Gemini解析用に gs:// から始まるURIを作成
                             gcs_image_uri = gcs_repo.get_gcs_uri(gcs_dest_path)
@@ -204,11 +212,6 @@ class GeminiService:
                             current_steps[i] = step_dict
                             
                             # [Firestore Update] 1ステップごとに更新
-                            # 注意: 並列実行時に競合する可能性がありますが、
-                            # Firestoreは最終書き込み勝ち(Last Write Wins)なので、
-                            # 頻度が高すぎなければ実用上は問題ないことが多いです。
-                            # 厳密にはBatch書き込みやトランザクションが必要ですが、
-                            # リアルタイム反映のために個別に更新します。
                             try:
                                 manual_service.update_manual_steps(user_id, manual_id, current_steps)
                             except Exception as e:
