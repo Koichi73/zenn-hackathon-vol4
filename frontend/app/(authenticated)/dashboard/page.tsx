@@ -26,22 +26,26 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+const BUCKET_NAME = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+
 const SAMPLES = [
     {
         id: 'sample-1',
         title: 'sample1',
-        path: '/samples/sample1.mov',
+        gsUrl: `gs://${BUCKET_NAME}/samples/sample1.mov`,
+        previewUrl: `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/samples%2Fsample1.mov?alt=media`,
     },
     {
         id: 'sample-2',
         title: 'sample2',
-        path: '/samples/sample2.mov',
+        gsUrl: `gs://${BUCKET_NAME}/samples/sample2.mov`,
+        previewUrl: `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/samples%2Fsample2.mov?alt=media`,
     },
 ];
 
 export default function DashboardPage() {
     const router = useRouter();
-    const { processVideo, isProcessing, steps, error, processingStage, uploadProgress, status, manualId, reset } = useVideo();
+    const { processVideo, processGcsVideo, isProcessing, steps, error, processingStage, uploadProgress, status, manualId, reset } = useVideo();
     const [manuals, setManuals] = useState<any[]>([]);
     const [isLoadingManuals, setIsLoadingManuals] = useState(true);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -140,18 +144,9 @@ export default function DashboardPage() {
     };
 
     const handleSampleSelect = async (sample: typeof SAMPLES[0]) => {
-        try {
-            const response = await fetch(sample.path);
-            if (!response.ok) throw new Error("Sample video not found");
-            const blob = await response.blob();
-            const file = new File([blob], `${sample.id}.mov`, { type: 'video/quicktime' });
-            setIsUploadOpen(true);
-            reset();
-            await processVideo(file);
-        } catch (err) {
-            console.error("Failed to load sample video:", err);
-            // Error is handled by VideoProvider's error state
-        }
+        setIsUploadOpen(true);
+        reset();
+        await processGcsVideo(sample.gsUrl, sample.title);
     };
 
     const handleDeleteClick = (manualId: string, e: React.MouseEvent) => {
@@ -300,7 +295,7 @@ export default function DashboardPage() {
                                                 {/* Action Buttons */}
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <button
-                                                        onClick={() => setPreviewVideo(sample.path)}
+                                                        onClick={() => setPreviewVideo(sample.previewUrl)}
                                                         className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-background hover:bg-muted transition-colors text-xs font-medium"
                                                     >
                                                         <Play className="h-3.5 w-3.5" />
@@ -311,7 +306,7 @@ export default function DashboardPage() {
                                                         className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs font-medium"
                                                     >
                                                         <Upload className="h-3.5 w-3.5" />
-                                                        Upload
+                                                        Analyze
                                                     </button>
                                                 </div>
                                             </div>
