@@ -1,6 +1,7 @@
 "use client";
+import { toast } from "@/hooks/use-toast";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { ref, uploadBytesResumable } from "firebase/storage";
 import { db, storage, auth } from "@/lib/firebase";
@@ -62,6 +63,7 @@ export function VideoProvider({ children }: { children: ReactNode }) {
   const [manualId, setManualId] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const hasShownRetryToastRef = useRef(false);
 
   // Monitor Auth State
   useEffect(() => {
@@ -99,11 +101,21 @@ export function VideoProvider({ children }: { children: ReactNode }) {
           setIsProcessing(false);
           setProcessingStage('completed');
         } else if (data.status === "error") {
-          setError("Analysis failed. Please try again.");
+          setError("gemini APIのアクセス集中により解析に失敗しました。もう一度お試しください。");
           setIsProcessing(false);
           setProcessingStage('idle');
         } else {
           // analyzing_structure, extracting_images, analyzing_details
+
+          if (data.error_code === "429_retry" && !hasShownRetryToastRef.current) {
+            toast({
+              title: "アクセス集中",
+              description: "gemini APIへのアクセスが集中しており、再試行しています。このままお待ちください。",
+              duration: 10000,
+            });
+            hasShownRetryToastRef.current = true;
+          }
+
           setIsProcessing(true);
           setProcessingStage('analyzing');
         }
@@ -278,6 +290,7 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     setUploadProgress(0);
     setStatus("");
     setManualId(null);
+    hasShownRetryToastRef.current = false;
   };
 
   return (

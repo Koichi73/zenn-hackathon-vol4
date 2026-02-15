@@ -80,7 +80,7 @@ class GeminiService:
         self.temperature = 1.0 if self.model_name == "gemini-3-flash-preview" else 0.0
 
     def _is_quota_error(self, exception):
-        """429/Quotaエラーかどうかを判定"""
+        """429エラーかどうかを判定"""
         error_msg = str(exception).lower()
         return "429" in error_msg or "too many requests" in error_msg or "quota" in error_msg or "resource exhausted" in error_msg
 
@@ -116,7 +116,7 @@ class GeminiService:
 
         # Phase 1: Video Structure
         print("Phase 1: Analyzing video structure...")
-        structures = await self.analyze_video_structure(gcs_video_uri)
+        structures = await self.analyze_video_structure(gcs_video_uri, user_id, manual_id, manual_service)
         if not structures:
             print("Phase 1 failed: No structure found.")
             manual_service.update_manual_status(user_id, manual_id, "error")
@@ -215,7 +215,10 @@ class GeminiService:
                             return
 
                         # 2. 詳細解析
-                        analyzed_step = await self.analyze_single_image(gcs_image_uri, title, timestamp, public_image_url)
+                        analyzed_step = await self.analyze_single_image(
+                            gcs_image_uri, title, timestamp, public_image_url,
+                            user_id, manual_id, manual_service
+                        )
                         
                         if analyzed_step:
                             # 3. リスト更新
@@ -243,7 +246,7 @@ class GeminiService:
                 manual_service.update_manual_status(user_id, manual_id, "error")
                 return []
         
-    async def analyze_video_structure(self, video_path: str) -> List[StepStructure]:
+    async def analyze_video_structure(self, video_path: str, user_id: str, manual_id: str, manual_service) -> List[StepStructure]:
         """
         Phase 1: Video to Structure (Timestamps & Titles)
         """
@@ -260,20 +263,32 @@ class GeminiService:
         start_time = time.time()
         logger.info("START: analyze_video_structure")
 
+        def _on_retry(retry_state):
+            # 1. 既存のログ出力
+            self._log_retry_attempt(retry_state)
+            
+            # 2. Firestore更新 (同期処理)
+            exception = retry_state.outcome.exception()
+            if self._is_quota_error(exception):
+                try:
+                    manual_service.update_manual_status(
+                        user_id, 
+                        manual_id, 
+                        status="analyzing_structure", 
+                        error_code="429_retry"
+                    )
+                except Exception as e:
+                    print(f"Failed to update manual status on retry: {e}")
+
         try:
             # tenacityによるリトライアノテーション
             @retry(
                 retry=retry_if_exception_type(Exception),
                 stop=stop_after_attempt(10),
                 wait=wait_random_exponential(multiplier=2, min=10, max=60),
-                before_sleep=self._log_retry_attempt
+                before_sleep=_on_retry
             )
             def _call_gemini_structure():
-                # --- テスト用のモックエラー（リトライをテストするにはコメント解除） ---
-                import random
-                if random.random() < 0.7:  # 70%の確率で失敗
-                    raise Exception("Mock 429: Too Many Requests")
-                # -------------------------------------------------------
 
                 return self.client.models.generate_content(
                     model=self.model_name,
@@ -297,7 +312,8 @@ class GeminiService:
             print(f"Error in Phase 1: {e}")
             return []
 
-    async def analyze_single_image(self, image_uri: str, title: str, timestamp: str, image_url: str) -> Optional[ManualStep]:
+    async def analyze_single_image(self, image_uri: str, title: str, timestamp: str, image_url: str,
+                                   user_id: str, manual_id: str, manual_service) -> Optional[ManualStep]:
         try:
             image_part = types.Part.from_uri(
                 file_uri=image_uri,
@@ -309,19 +325,31 @@ class GeminiService:
             start_time = time.time()
             logger.info(f"START: analyze_single_image for step '{title}' ({image_uri})")
 
+            def _on_retry(retry_state):
+                # 1. ログ出力
+                self._log_retry_attempt(retry_state)
+                
+                # 2. Firestore更新
+                exception = retry_state.outcome.exception()
+                if self._is_quota_error(exception):
+                    try:
+                        manual_service.update_manual_status(
+                            user_id, 
+                            manual_id, 
+                            status="analyzing_details", 
+                            error_code="429_retry"
+                        )
+                    except Exception as e:
+                        print(f"Failed to update manual status on retry: {e}")
+
             # tenacityによるリトライアノテーション
             @retry(
                 retry=retry_if_exception_type(Exception),
                 stop=stop_after_attempt(10),
                 wait=wait_random_exponential(multiplier=2, min=10, max=60),
-                before_sleep=self._log_retry_attempt
+                before_sleep=_on_retry
             )
             def _call_gemini_image():
-                # --- テスト用のモックエラー（リトライをテストするにはコメント解除） ---
-                import random
-                if random.random() < 0.7:  # 70%の確率で失敗
-                    raise Exception("Mock 429: Too Many Requests")
-                # -------------------------------------------------------
 
                 return self.client.models.generate_content(
                     model=self.model_name,

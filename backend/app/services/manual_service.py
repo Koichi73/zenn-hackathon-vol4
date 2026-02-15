@@ -141,13 +141,17 @@ class ManualService:
         )
         return manual_id
 
-    def update_manual_status(self, user_id: str, manual_id: str, status: str):
-        """ステータスのみ更新"""
+    def update_manual_status(self, user_id: str, manual_id: str, status: str, error_code: str = None):
+        """ステータスとエラーコードを更新"""
         collection_path = f"users/{user_id}/manuals"
-        self.firestore_repository.update_document(collection_path, manual_id, {
+        data = {
             "status": status,
             "updated_at": firestore.SERVER_TIMESTAMP
-        })
+        }
+        if error_code:
+            data["error_code"] = error_code
+
+        self.firestore_repository.update_document(collection_path, manual_id, data)
 
     def init_manual_steps(self, user_id: str, manual_id: str, steps_structure: List[Dict]):
         """
