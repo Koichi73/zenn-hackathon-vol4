@@ -12,24 +12,11 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: 'Manual AI - Project Dashboard',
-  description: 'Manage your projects with Manual AI',
+  title: '撮るだけマニュアル',
+  description: '動画から手順を自動生成するAIサービス',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
+    icon: '/apple-icon.png',
     apple: '/apple-icon.png',
   },
 }

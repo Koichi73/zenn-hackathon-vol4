@@ -33,16 +33,12 @@ export function GlobalHeader() {
         <header className="sticky top-0 z-50 w-full border-b bg-white relative">
             <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
                 {/* Left: Brand Logo - Acts as "Back to Dashboard" */}
-                <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                        <span className="text-sm font-bold text-primary-foreground">M</span>
-                    </div>
-                    <span className="text-xl font-semibold text-foreground">Manual AI</span>
-                    {/* {isDemoMode && (
-                        <span className="ml-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200 rounded-full">
-                            Demo Mode
-                        </span>
-                    )} */}
+                <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+                    <img
+                        src="/logo.png"
+                        alt="撮るだけマニュアル"
+                        className="h-8 w-auto object-contain"
+                    />
                 </Link>
 
                 {/* Right: User Profile Avatar */}

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Upload, Video, Loader2 } from 'lucide-react';
 import { useVideo } from "@/components/providers/VideoProvider";
 import { Progress } from "@/components/ui/progress";
+import { LoadingTips } from "@/components/features/loading/LoadingTips";
 
 export function UploadView() {
     const { processVideo, isProcessing, error, processingStage, uploadProgress } = useVideo();
@@ -97,6 +98,9 @@ export function UploadView() {
                                     <p className="text-muted-foreground">
                                         Gemini is extracting steps and generating your manual.
                                     </p>
+                                    <div className="mt-8">
+                                        <LoadingTips />
+                                    </div>
                                 </div>
                             </>
                         ) : (
@@ -128,14 +132,16 @@ export function UploadView() {
                     </div>
                 </label>
 
-                {!isProcessing && (
-                    <div className="mt-8 text-center">
-                        <p className="text-sm text-muted-foreground">
-                            Your video will be processed automatically to create an interactive manual
-                        </p>
-                    </div>
-                )}
-            </div>
-        </div>
+                {
+                    !isProcessing && (
+                        <div className="mt-8 text-center">
+                            <p className="text-sm text-muted-foreground">
+                                Your video will be processed automatically to create an interactive manual
+                            </p>
+                        </div>
+                    )
+                }
+            </div >
+        </div >
     );
 }
