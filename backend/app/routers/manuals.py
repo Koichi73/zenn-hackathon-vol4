@@ -64,13 +64,17 @@ async def toggle_manual_publish(
 
 
 @router.get("/manuals")
-async def list_user_manuals(user_id: str = Depends(get_current_user)):
+async def list_user_manuals(
+    limit: int = 8,
+    cursor: Optional[str] = None,
+    user_id: str = Depends(get_current_user)
+):
     # ログインユーザーのIDを取得する
     
     service = ManualService()
-    manuals = service.get_user_manuals(user_id)
+    result = service.get_user_manuals(user_id, limit, cursor)
     
-    return {"manuals": manuals}
+    return result
 
 
 @router.delete("/manuals/{manual_id}")

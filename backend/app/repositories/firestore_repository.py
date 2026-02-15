@@ -111,3 +111,32 @@ class FirestoreRepository:
         docs = query.stream()
         return [{"id": doc.id, **doc.to_dict()} for doc in docs]
 
+
+    def get_documents_ordered(
+        self,
+        collection_name: str,
+        limit: int = 8,
+        order_by: str = "created_at",
+        descending: bool = True,
+        start_after_doc_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        コレクション内のドキュメントをソートして取得（ページネーション対応）
+        start_after_doc_id: 前のページの最後のドキュメントID（カーソル）
+        """
+        collection_ref = self.db.collection(collection_name)
+        
+        direction = firestore.Query.DESCENDING if descending else firestore.Query.ASCENDING
+        query = collection_ref.order_by(order_by, direction=direction).limit(limit)
+
+        if start_after_doc_id:
+            # カーソルとなるドキュメントを取得
+            cursor_doc = collection_ref.document(start_after_doc_id).get()
+            if cursor_doc.exists:
+                query = query.start_after(cursor_doc)
+            else:
+                # カーソルが見つからない場合は空リストを返す
+                return []
+
+        docs = query.stream()
+        return [{"id": doc.id, **doc.to_dict()} for doc in docs]
