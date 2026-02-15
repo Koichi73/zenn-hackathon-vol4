@@ -86,7 +86,7 @@ class ManualService:
             "step_count": len(steps),
             "status": "completed",
             "updated_at": firestore.SERVER_TIMESTAMP,
-            "steps": steps
+            "steps": steps,
             # is_public は変更しない
         }
 
@@ -237,29 +237,37 @@ class ManualService:
             return False
 
 
-    def get_user_manuals(self, user_id: str) -> List[Dict[str, Any]]:
+    def get_user_manuals(self, user_id: str, limit: int = 8, cursor: str = None) -> Dict[str, Any]:
         """
-        特定のユーザーのマニュアル一覧を取得する
+        特定のユーザーのマニュアル一覧を取得する（ページネーション対応）
         """
         collection_path = f"users/{user_id}/manuals"
         try:
-            # Firestoreから全件取得
-            # 実際にはページネーションやソートが必要だが、一旦全件取得
-            all_docs = self.firestore_repository.get_all_documents(collection_path)
+            # Firestoreからページネーション付きで取得
+            # updated_at の降順でソート
+            docs = self.firestore_repository.get_documents_ordered(
+                collection_name=collection_path,
+                limit=limit,
+                order_by="updated_at",
+                descending=True,
+                start_after_doc_id=cursor
+            )
             
-            # 作成日時の降順でソート (Firestoreから取得時点でソートされていない場合)
-            # created_at が firestore.SERVER_TIMESTAMP の場合、ローカルでは datetime オブジェクト等として扱える
-            # Noneの場合を考慮してソート
-            # FirestoreのTimestampはtzinfoを持つため、datetime.minもtzinfoを持つ必要がある
-            from datetime import timezone
-            min_date = datetime.min.replace(tzinfo=timezone.utc)
+            # 次のカーソルを決定
+            next_cursor = None
+            if len(docs) == limit:
+                next_cursor = docs[-1]["id"]
             
-            all_docs.sort(key=lambda x: x.get('created_at') or min_date, reverse=True)
-            
-            return all_docs
+            return {
+                "manuals": docs,
+                "next_cursor": next_cursor
+            }
         except Exception as e:
             print(f"Error getting user manuals: {e}")
-            return []
+            return {
+                "manuals": [],
+                "next_cursor": None
+            }
 
     def delete_manual(self, user_id: str, manual_id: str) -> bool:
         """
