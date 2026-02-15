@@ -53,9 +53,11 @@ export default function SignupPage() {
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
                     <div className="flex justify-center mb-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-                            <span className="text-2xl font-bold text-primary-foreground">M</span>
-                        </div>
+                        <img
+                            src="/logo.png"
+                            alt="撮るだけマニュアル"
+                            className="h-12 w-auto object-contain"
+                        />
                     </div>
                     <CardTitle className="text-2xl">Create an account</CardTitle>
                     <CardDescription>
