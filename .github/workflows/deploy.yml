@@ -55,6 +55,9 @@ jobs:
           FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
           API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          AUTO_LOGIN: ${{ secrets.NEXT_PUBLIC_AUTO_LOGIN }}
+          DEMO_EMAIL: ${{ secrets.NEXT_PUBLIC_DEMO_EMAIL }}
+          DEMO_PASSWORD: ${{ secrets.NEXT_PUBLIC_DEMO_PASSWORD }}
         run: |
           docker build \
             --build-arg NEXT_PUBLIC_FIREBASE_API_KEY=$FIREBASE_API_KEY \
@@ -64,6 +67,9 @@ jobs:
             --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=$FIREBASE_MESSAGING_SENDER_ID \
             --build-arg NEXT_PUBLIC_FIREBASE_APP_ID=$FIREBASE_APP_ID \
             --build-arg NEXT_PUBLIC_API_URL=$API_URL \
+            --build-arg NEXT_PUBLIC_AUTO_LOGIN=$AUTO_LOGIN \
+            --build-arg NEXT_PUBLIC_DEMO_EMAIL=$DEMO_EMAIL \
+            --build-arg NEXT_PUBLIC_DEMO_PASSWORD=$DEMO_PASSWORD \
             -t asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend/frontend:${{ github.sha }} \
             ./frontend
           docker push asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend/frontend:${{ github.sha }}
