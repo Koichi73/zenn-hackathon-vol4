@@ -7,7 +7,8 @@ const TIPS = [
     "Geminiは1秒ごとに動画解析をします。収録の際はゆっくり操作してください。",
     "アカウント未作成でも、デフォルトユーザーとしてログインできます。",
     "動画解析中はブラウザを閉じても問題ありません。",
-    "ダッシュボードのタグは、マニュアルを共有したらshareに、停止したらprivateになります。"
+    "ダッシュボードのタグは、マニュアルを共有したらshareに、停止したらprivateになります。",
+    "Gemini APIへのアクセスが集中時に429エラーが発生することがあり、解析に時間がかかる場合があります。"
 ];
 
 interface LoadingTipsProps {
@@ -15,17 +16,23 @@ interface LoadingTipsProps {
 }
 
 export function LoadingTips({ className }: LoadingTipsProps) {
-    const [currentTipIndex, setCurrentTipIndex] = useState(0);
+    const [currentTipIndex, setCurrentTipIndex] = useState(() => Math.floor(Math.random() * TIPS.length));
     const [isFading, setIsFading] = useState(false);
 
     useEffect(() => {
         const interval = setInterval(() => {
             setIsFading(true);
             setTimeout(() => {
-                setCurrentTipIndex((prev) => (prev + 1) % TIPS.length);
+                setCurrentTipIndex((prev) => {
+                    let next;
+                    do {
+                        next = Math.floor(Math.random() * TIPS.length);
+                    } while (next === prev && TIPS.length > 1);
+                    return next;
+                });
                 setIsFading(false);
             }, 600);
-        }, 10000);
+        }, 8000);
 
         return () => clearInterval(interval);
     }, []);
