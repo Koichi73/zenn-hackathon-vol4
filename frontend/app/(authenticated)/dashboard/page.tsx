@@ -251,9 +251,6 @@ export default function DashboardPage() {
                                                 <h3 className="font-semibold text-foreground">
                                                     Analyzing video...
                                                 </h3>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Extracting frames and structure...
-                                                </p>
                                                 <div className="mt-4">
                                                     <LoadingTips />
                                                 </div>
