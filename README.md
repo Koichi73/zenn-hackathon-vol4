@@ -1,7 +1,7 @@
 # 【撮るだけマニュアル】 画面収録データからマニュアルを自動生成！
 
 ## 各種リンク
-- **記事**: [【撮るだけマニュアル】 画面収録データからマニュアルを自動生成！ 〜 Zenn](https://zenn.dev/) （URLを記載）
+- **記事**: [【撮るだけマニュアル】 画面収録データからマニュアルを自動生成！ 〜 Zenn](https://zenn.dev/koichi73/articles/e726853482d639) （URLを記載）
 - **デモ動画**: 画像をクリックで遷移<br>
 
 [<img src="https://img.youtube.com/vi/0g-uGiHP0q0/maxresdefault.jpg" width="100%">](https://www.youtube.com/watch?v=0g-uGiHP0q0)
