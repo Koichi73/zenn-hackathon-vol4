@@ -9,7 +9,6 @@ import { Progress } from "@/components/ui/progress";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getAllUnreadCounts } from "@/api/comment-api";
-import { deleteManual } from "@/api/manual-api";
 import {
     Dialog,
     DialogContent,
@@ -26,6 +25,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LoadingTips } from "@/components/features/loading/LoadingTips";
+import { deleteManual } from "@/api/manual-api";
 
 const BUCKET_NAME = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
@@ -114,6 +114,13 @@ export default function DashboardPage() {
             router.push(`/editor/${manualId}`);
         }
     }, [status, isUploadOpen, router, manualId]);
+
+    // エラーを検知してアップロードダイアログを開く
+    useEffect(() => {
+        if (error) {
+            setIsUploadOpen(true);
+        }
+    }, [error]);
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();

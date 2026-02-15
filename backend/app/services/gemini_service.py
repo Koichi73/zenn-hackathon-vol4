@@ -212,7 +212,7 @@ class GeminiService:
                             
                         except Exception as e:
                             print(f"Image upload failed for step {i}: {e}")
-                            return
+                            raise e
 
                         # 2. 詳細解析
                         analyzed_step = await self.analyze_single_image(
@@ -391,6 +391,6 @@ class GeminiService:
 
         except Exception as e:
             print(f"Error in Phase 3 for {title}: {e}")
-            return None
+            raise e
     
 
