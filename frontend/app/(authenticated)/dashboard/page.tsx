@@ -49,6 +49,8 @@ export default function DashboardPage() {
     const { processVideo, processGcsVideo, isProcessing, steps, error, processingStage, uploadProgress, status, manualId, reset } = useVideo();
     const [manuals, setManuals] = useState<any[]>([]);
     const [isLoadingManuals, setIsLoadingManuals] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [unreadCounts, setUnreadCounts] = useState<{ [manualId: string]: number }>({});
@@ -57,29 +59,50 @@ export default function DashboardPage() {
     const [manualToDelete, setManualToDelete] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const fetchManuals = async (user: any) => {
+    const fetchManuals = async (user: any, cursor: string | null = null) => {
         if (!user) return;
+
+        if (cursor) {
+            setIsLoadingMore(true);
+        } else {
+            setIsLoadingManuals(true);
+        }
+
         try {
             const token = await user.getIdToken();
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-            const response = await fetch(`${apiUrl}/manuals`, {
+
+            let url = `${apiUrl}/manuals?limit=8`;
+            if (cursor) {
+                url += `&cursor=${cursor}`;
+            }
+
+            const response = await fetch(url, {
                 headers: {
                     "Authorization": `Bearer ${token}`
                 }
             });
+
             if (response.ok) {
                 const data = await response.json();
-                console.log("Fetched manuals:", data.manuals); // DEBUG LOG
-                setManuals(data.manuals || []);
+                console.log("Fetched manuals:", data.manuals);
 
-                // 未読コメント数を取得
-                if (data.manuals && data.manuals.length > 0) {
-                    const manualIds = data.manuals.map((m: any) => m.id);
-                    console.log("Fetching unread counts for manual IDs:", manualIds);
+                const newManuals = data.manuals || [];
+
+                if (cursor) {
+                    setManuals(prev => [...prev, ...newManuals]);
+                } else {
+                    setManuals(newManuals);
+                }
+
+                setNextCursor(data.next_cursor || null);
+
+                // 未読コメント数を取得 
+                if (newManuals.length > 0) {
+                    const manualIds = newManuals.map((m: any) => m.id);
                     try {
                         const counts = await getAllUnreadCounts(manualIds);
-                        console.log("Unread counts received:", counts);
-                        setUnreadCounts(counts);
+                        setUnreadCounts(prev => ({ ...prev, ...counts }));
                     } catch (err) {
                         console.error("Failed to fetch unread counts:", err);
                     }
@@ -91,6 +114,7 @@ export default function DashboardPage() {
             console.error("Error fetching manuals:", error);
         } finally {
             setIsLoadingManuals(false);
+            setIsLoadingMore(false);
         }
     };
 
@@ -356,121 +380,146 @@ export default function DashboardPage() {
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Upload Area Card */}
-                    <div
-                        className={`
-                            border-2 border-dashed rounded-xl p-6 
-                            transition-all duration-300 cursor-pointer
-                            flex flex-col items-center justify-center text-center
-                            min-h-[280px] group relative overflow-hidden
-                            ${isDragging
-                                ? 'border-primary bg-primary/10 scale-[1.01] shadow-lg'
-                                : 'border-border bg-muted/20 hover:border-primary/50 hover:bg-muted/40 hover:shadow-sm'}
-                        `}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        onClick={() => {
-                            reset();
-                            setIsUploadOpen(true);
-                        }}
-                    >
-                        {/* subtle gradient background on hover */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="flex flex-col gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {/* Upload Area Card */}
+                        <div
+                            className={`
+                                border-2 border-dashed rounded-xl p-6 
+                                transition-all duration-300 cursor-pointer
+                                flex flex-col items-center justify-center text-center
+                                min-h-[280px] group relative overflow-hidden
+                                ${isDragging
+                                    ? 'border-primary bg-primary/10 scale-[1.01] shadow-lg'
+                                    : 'border-border bg-muted/20 hover:border-primary/50 hover:bg-muted/40 hover:shadow-sm'}
+                            `}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            onClick={() => {
+                                reset();
+                                setIsUploadOpen(true);
+                            }}
+                        >
+                            {/* subtle gradient background on hover */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                        <div className="relative z-10 flex flex-col items-center">
-                            <div className="bg-primary/10 p-5 rounded-full mb-5 group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
-                                <Upload className="w-10 h-10 text-primary" />
+                            <div className="relative z-10 flex flex-col items-center">
+                                <div className="bg-primary/10 p-5 rounded-full mb-5 group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
+                                    <Upload className="w-10 h-10 text-primary" />
+                                </div>
+                                <h3 className="font-bold text-xl mb-2 text-foreground group-hover:text-primary transition-colors">
+                                    Click or Drag to Upload
+                                </h3>
+                                <p className="text-sm text-muted-foreground max-w-[200px] leading-relaxed">
+                                    MP4, MOV (Max 500MB)
+                                </p>
                             </div>
-                            <h3 className="font-bold text-xl mb-2 text-foreground group-hover:text-primary transition-colors">
-                                Click or Drag to Upload
-                            </h3>
-                            <p className="text-sm text-muted-foreground max-w-[200px] leading-relaxed">
-                                MP4, MOV (Max 500MB)
-                            </p>
                         </div>
+
+                        {manuals.map((manual) => {
+                            const unreadCount = unreadCounts[manual.id] || 0;
+
+                            return (
+                                <div
+                                    key={manual.id}
+                                    className="border rounded-lg p-6 bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow cursor-pointer relative"
+                                    onClick={() => router.push(`/editor/${manual.id}`)}
+                                >
+                                    {/* Three-dot menu */}
+                                    <div className="absolute top-2 right-2 z-20" onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <button className="p-1.5 rounded-md bg-white/80 backdrop-blur-sm shadow-sm outline-none focus-visible:outline-none">
+                                                    <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem
+                                                    variant="destructive"
+                                                    onClick={(e) => handleDeleteClick(manual.id, e)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    削除
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    {/* Unread Badge */}
+                                    {unreadCount > 0 && (
+                                        <div className="absolute top-3 left-3 bg-blue-500 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md z-10">
+                                            <MessageCircle className="w-3 h-3" />
+                                            <span className="font-medium">{unreadCount}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="h-40 bg-muted rounded-md mb-4 flex items-center justify-center text-muted-foreground relative overflow-hidden">
+                                        {manual.thumbnail_url ? (
+                                            <img src={manual.thumbnail_url} alt={manual.title} className="object-cover w-full h-full select-none" draggable="false" />
+                                        ) : (
+                                            <Video className="h-12 w-12 opacity-20" />
+                                        )}
+                                        <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                                            {manual.step_count || 0} Steps
+                                        </div>
+                                    </div>
+                                    <h3 className="font-semibold text-lg mb-1 truncate" title={manual.title}>
+                                        {manual.title || "Untitled Manual"}
+                                    </h3>
+                                    <div className="flex justify-between items-center mt-4">
+                                        <div className="flex gap-2">
+                                            {/* 解析中/解析失敗 */}
+                                            {manual.status !== 'completed' && (
+                                                <span className={`text-xs px-2 py-1 rounded-full ${manual.status === 'error'
+                                                    ? 'bg-red-100 text-red-700'
+                                                    : 'bg-yellow-100 text-yellow-700'
+                                                    }`}>
+                                                    {manual.status === 'error' ? 'Error' : 'Analyzing'}
+                                                </span>
+                                            )}
+
+                                            {/* 公開/非公開 */}
+                                            {manual.status === 'completed' && (
+                                                <span className={`text-xs px-2 py-1 rounded-full ${manual.is_public
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-slate-100 text-slate-600'
+                                                    }`}>
+                                                    {manual.is_public ? 'Shared' : 'Private'}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-muted-foreground">
+                                            {manual.created_at ? new Date(manual.created_at).toLocaleDateString() : ''}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
 
-                    {manuals.map((manual) => {
-                        const unreadCount = unreadCounts[manual.id] || 0;
-
-                        return (
-                            <div
-                                key={manual.id}
-                                className="border rounded-lg p-6 bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow cursor-pointer relative"
-                                onClick={() => router.push(`/editor/${manual.id}`)}
+                    {/* Load More Button */}
+                    {nextCursor && (
+                        <div className="flex justify-center mt-4">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    const user = auth.currentUser;
+                                    if (user) fetchManuals(user, nextCursor);
+                                }}
+                                disabled={isLoadingMore}
                             >
-                                {/* Three-dot menu */}
-                                <div className="absolute top-2 right-2 z-20" onClick={(e) => e.stopPropagation()}>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <button className="p-1.5 rounded-md bg-white/80 backdrop-blur-sm shadow-sm outline-none focus-visible:outline-none">
-                                                <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem
-                                                variant="destructive"
-                                                onClick={(e) => handleDeleteClick(manual.id, e)}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                                削除
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-
-                                {/* Unread Badge */}
-                                {unreadCount > 0 && (
-                                    <div className="absolute top-3 left-3 bg-blue-500 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md z-10">
-                                        <MessageCircle className="w-3 h-3" />
-                                        <span className="font-medium">{unreadCount}</span>
-                                    </div>
+                                {isLoadingMore ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Loading...
+                                    </>
+                                ) : (
+                                    'Load More'
                                 )}
-
-                                <div className="h-40 bg-muted rounded-md mb-4 flex items-center justify-center text-muted-foreground relative overflow-hidden">
-                                    {manual.thumbnail_url ? (
-                                        <img src={manual.thumbnail_url} alt={manual.title} className="object-cover w-full h-full select-none" draggable="false" />
-                                    ) : (
-                                        <Video className="h-12 w-12 opacity-20" />
-                                    )}
-                                    <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                                        {manual.step_count || 0} Steps
-                                    </div>
-                                </div>
-                                <h3 className="font-semibold text-lg mb-1 truncate" title={manual.title}>
-                                    {manual.title || "Untitled Manual"}
-                                </h3>
-                                <div className="flex justify-between items-center mt-4">
-                                    <div className="flex gap-2">
-                                        {/* 解析中/解析失敗 */}
-                                        {manual.status !== 'completed' && (
-                                            <span className={`text-xs px-2 py-1 rounded-full ${manual.status === 'error'
-                                                ? 'bg-red-100 text-red-700'
-                                                : 'bg-yellow-100 text-yellow-700'
-                                                }`}>
-                                                {manual.status === 'error' ? 'Error' : 'Analyzing'}
-                                            </span>
-                                        )}
-
-                                        {/* 公開/非公開 */}
-                                        {manual.status === 'completed' && (
-                                            <span className={`text-xs px-2 py-1 rounded-full ${manual.is_public
-                                                ? 'bg-green-100 text-green-700'
-                                                : 'bg-slate-100 text-slate-600'
-                                                }`}>
-                                                {manual.is_public ? 'Shared' : 'Private'}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">
-                                        {manual.created_at ? new Date(manual.created_at).toLocaleDateString() : ''}
-                                    </span>
-                                </div>
-                            </div>
-                        );
-                    })}
+                            </Button>
+                        </div>
+                    )}
                 </div>
             )}
 
