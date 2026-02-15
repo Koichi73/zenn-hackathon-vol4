@@ -12,6 +12,16 @@ export default function EditorPage() {
     const router = useRouter();
 
     useEffect(() => {
+        if (status === "error") {
+            console.log("Analysis error detected. Redirecting to dashboard...");
+            const timer = setTimeout(() => {
+                router.push("/dashboard");
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [status, router]);
+
+    useEffect(() => {
         // Set manualId from URL params to trigger Firestore listener in context
         if (id && id !== manualId) {
             setManualId(id);

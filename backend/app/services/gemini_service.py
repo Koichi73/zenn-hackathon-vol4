@@ -13,6 +13,7 @@ import time
 import logging
 import uuid
 from app.repositories.gcs_repository import GCSRepository
+from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type, before_sleep
 
 load_dotenv()
 
@@ -69,26 +70,36 @@ class GeminiService:
         if not project_id:
             raise ValueError("PROJECT_ID not set in environment variables")
             
-        # 429エラー対策: リトライ設定
-        retry_options = types.HttpRetryOptions(
-            attempts=10,
-            initial_delay=10,
-            max_delay=60,
-            exp_base=2,
-            jitter=1
-        )
-
         self.client = genai.Client(
             vertexai=True,
             project=project_id,
             location=location,
-            http_options=types.HttpOptions(
-                retry_options=retry_options
-            )
         )
         
         self.model_name = os.getenv("MODEL_NAME", "gemini-3-flash-preview")
         self.temperature = 1.0 if self.model_name == "gemini-3-flash-preview" else 0.0
+
+    def _is_quota_error(self, exception):
+        """429エラーかどうかを判定"""
+        error_msg = str(exception).lower()
+        return "429" in error_msg or "too many requests" in error_msg or "quota" in error_msg or "resource exhausted" in error_msg
+
+    def _log_retry_attempt(self, retry_state):
+        """Tenacity: リトライ発生時に呼ばれるコールバック"""
+        exception = retry_state.outcome.exception()
+        wait_time = retry_state.next_action.sleep
+        
+        if self._is_quota_error(exception):
+            logger.warning(
+                f"🚨 Gemini API Quota Exceeded (429). Retrying in {wait_time:.2f}s... "
+                f"(Attempt {retry_state.attempt_number}) - Error: {exception}"
+            )
+            # ここでSlack通知などの追加アクションが可能
+        else:
+            logger.warning(
+                f"⚠️ Gemini API Request Failed. Retrying in {wait_time:.2f}s... "
+                f"(Attempt {retry_state.attempt_number}) - Error: {exception}"
+            )
 
     async def generate_manual_from_video(self, user_id: str, video_service, manual_id: str, manual_service, gcs_video_uri: str) -> List[ManualStep]:
         """
@@ -105,7 +116,7 @@ class GeminiService:
 
         # Phase 1: Video Structure
         print("Phase 1: Analyzing video structure...")
-        structures = await self.analyze_video_structure(gcs_video_uri)
+        structures = await self.analyze_video_structure(gcs_video_uri, user_id, manual_id, manual_service)
         if not structures:
             print("Phase 1 failed: No structure found.")
             manual_service.update_manual_status(user_id, manual_id, "error")
@@ -201,10 +212,13 @@ class GeminiService:
                             
                         except Exception as e:
                             print(f"Image upload failed for step {i}: {e}")
-                            return
+                            raise e
 
                         # 2. 詳細解析
-                        analyzed_step = await self.analyze_single_image(gcs_image_uri, title, timestamp, public_image_url)
+                        analyzed_step = await self.analyze_single_image(
+                            gcs_image_uri, title, timestamp, public_image_url,
+                            user_id, manual_id, manual_service
+                        )
                         
                         if analyzed_step:
                             # 3. リスト更新
@@ -232,7 +246,7 @@ class GeminiService:
                 manual_service.update_manual_status(user_id, manual_id, "error")
                 return []
         
-    async def analyze_video_structure(self, video_path: str) -> List[StepStructure]:
+    async def analyze_video_structure(self, video_path: str, user_id: str, manual_id: str, manual_service) -> List[StepStructure]:
         """
         Phase 1: Video to Structure (Timestamps & Titles)
         """
@@ -249,18 +263,45 @@ class GeminiService:
         start_time = time.time()
         logger.info("START: analyze_video_structure")
 
+        def _on_retry(retry_state):
+            # 1. 既存のログ出力
+            self._log_retry_attempt(retry_state)
+            
+            # 2. Firestore更新 (同期処理)
+            exception = retry_state.outcome.exception()
+            if self._is_quota_error(exception):
+                try:
+                    manual_service.update_manual_status(
+                        user_id, 
+                        manual_id, 
+                        status="analyzing_structure", 
+                        error_code="429_retry"
+                    )
+                except Exception as e:
+                    print(f"Failed to update manual status on retry: {e}")
+
         try:
-            # Run blocking API call in thread
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
-                model=self.model_name,
-                contents=[video_part, prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=list[StepStructure],
-                    temperature=self.temperature,
-                )
+            # tenacityによるリトライアノテーション
+            @retry(
+                retry=retry_if_exception_type(Exception),
+                stop=stop_after_attempt(10),
+                wait=wait_random_exponential(multiplier=2, min=10, max=60),
+                before_sleep=_on_retry
             )
+            def _call_gemini_structure():
+
+                return self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[video_part, prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=list[StepStructure],
+                        temperature=self.temperature,
+                    )
+                )
+
+            # Run blocking API call in thread
+            response = await asyncio.to_thread(_call_gemini_structure)
             
             duration = time.time() - start_time
             logger.info(f"END: analyze_video_structure. Duration: {duration:.4f}s")
@@ -271,7 +312,8 @@ class GeminiService:
             print(f"Error in Phase 1: {e}")
             return []
 
-    async def analyze_single_image(self, image_uri: str, title: str, timestamp: str, image_url: str) -> Optional[ManualStep]:
+    async def analyze_single_image(self, image_uri: str, title: str, timestamp: str, image_url: str,
+                                   user_id: str, manual_id: str, manual_service) -> Optional[ManualStep]:
         try:
             image_part = types.Part.from_uri(
                 file_uri=image_uri,
@@ -283,18 +325,45 @@ class GeminiService:
             start_time = time.time()
             logger.info(f"START: analyze_single_image for step '{title}' ({image_uri})")
 
-            # Run blocking API call in thread
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
-                model=self.model_name,
-                contents=[image_part, prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=StepDetail,
-                    temperature=self.temperature,
-                    thinking_config=types.ThinkingConfig(thinking_level="low"),
-                )
+            def _on_retry(retry_state):
+                # 1. ログ出力
+                self._log_retry_attempt(retry_state)
+                
+                # 2. Firestore更新
+                exception = retry_state.outcome.exception()
+                if self._is_quota_error(exception):
+                    try:
+                        manual_service.update_manual_status(
+                            user_id, 
+                            manual_id, 
+                            status="analyzing_details", 
+                            error_code="429_retry"
+                        )
+                    except Exception as e:
+                        print(f"Failed to update manual status on retry: {e}")
+
+            # tenacityによるリトライアノテーション
+            @retry(
+                retry=retry_if_exception_type(Exception),
+                stop=stop_after_attempt(10),
+                wait=wait_random_exponential(multiplier=2, min=10, max=60),
+                before_sleep=_on_retry
             )
+            def _call_gemini_image():
+
+                return self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[image_part, prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=StepDetail,
+                        temperature=self.temperature,
+                        thinking_config=types.ThinkingConfig(thinking_level="low"),
+                    )
+                )
+
+            # Run blocking API call in thread
+            response = await asyncio.to_thread(_call_gemini_image)
             
             duration = time.time() - start_time
             logger.info(f"END: analyze_single_image for step '{title}'. Duration: {duration:.4f}s")
@@ -322,6 +391,6 @@ class GeminiService:
 
         except Exception as e:
             print(f"Error in Phase 3 for {title}: {e}")
-            return None
+            raise e
     
 
